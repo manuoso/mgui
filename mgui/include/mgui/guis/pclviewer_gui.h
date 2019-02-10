@@ -6,8 +6,8 @@
 //															   //
 /////////////////////////////////////////////////////////////////
 
-#ifndef PCLVIEWER_GUI_H
-#define PCLVIEWER_GUI_H
+#ifndef GUIS_PCLVIEWER_GUI_H
+#define GUIS_PCLVIEWER_GUI_H
 
 #include <iostream>
 #include <QMainWindow>
@@ -17,6 +17,8 @@
 #include <mutex>
 #include <thread>
 #include <chrono>
+
+#include <rapidjson/document.h>
 
 #include <pcl/io/io.h>
 #include <pcl/io/pcd_io.h>
@@ -30,16 +32,8 @@
 
 #include <vtkRenderWindow.h>
 
-#include <ros/ros.h>
 #include <pcl_ros/point_cloud.h>
 #include <pcl_conversions/pcl_conversions.h>
-
-#include <geometry_msgs/PoseStamped.h>
-
-#include <rapidjson/document.h>
-
-#include <pointcloudGUI/WaypointsData.h>
-#include <std_srvs/SetBool.h>
 
 typedef pcl::PointXYZ PointT1;
 typedef pcl::PointCloud<PointT1> PointCloudT1;
@@ -47,13 +41,11 @@ typedef pcl::PointCloud<PointT1> PointCloudT1;
 typedef pcl::PointXYZRGB PointT2;
 typedef pcl::PointCloud<PointT2> PointCloudT2;
 
-namespace Ui
-{
+namespace Ui {
     class PCLViewer_gui;
 }
 
-class PCLViewer_gui : public QMainWindow
-{
+class PCLViewer_gui : public QMainWindow {
     Q_OBJECT
 
 public:
@@ -69,28 +61,18 @@ public:
     /// \return true if params are good or without errors, false if something failed
     bool configureGUI(int _argc, char **_argv);
 
-signals:
-    /// Signal that warns that there is a change in the pose of the uav
-    void poseUAVchanged();
-
 private slots:
-    /// Slot that export to TXT file the waypoints
-    void exportToTXT();
-
-    /// Slot that load from TXT file the waypoints to go and put it in PCL GUI visualizer
-    void loadFromTXT();
-
-    /// Slot for delete spheres in PCL GUI and delete vector of waypoints
-    void Delete_SpheresClicked();
+    /// Slot for delete sphere in PCL GUI
+    void deleteSphere();
 
     /// Slot that add waypoint into a vector of waypoints
     void addWaypoint();
 
-    /// Slot that send waypoints through a custom ROS Service
-    void runGoToWaypoints();
+    /// Slot that generate and visualize the trayectory
+    void run_generateTray();
 
-    /// Slot that send order to fly through a bool ROS Service
-    void runFly();
+    /// Slot that send mission
+    void run_sendMision();
 
 private:
     /// Method for extract the pointcloud in TXT file, PCD or PLY
@@ -107,10 +89,6 @@ private:
     /// \param _event: x, y and z captured and other info
     /// \param _args: args from picking
     void pointPickingOccurred(const pcl::visualization::PointPickingEvent &_event, void* _args);
-
-    /// Method for visualize a pose from a topic of ROS
-    /// \param _msg: data receive to update pose
-    void CallbackPose(const geometry_msgs::PoseStamped::ConstPtr& _msg);
 
     /// Method that add a object to PCL GUI visualizer
     /// \param _name: name of the object to add
@@ -159,10 +137,6 @@ private:
 
     std::mutex mObjectLock;
 
-    ros::Subscriber mPoseSubscriber;
-    ros::ServiceClient mWPReq, mFlyReq;
-
 };
 
-
-#endif // PCLVIEWER_GUI_H
+#endif // GUIS_PCLVIEWER_GUI_H

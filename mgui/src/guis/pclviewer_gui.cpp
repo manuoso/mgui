@@ -6,8 +6,8 @@
 //															   //
 /////////////////////////////////////////////////////////////////
 
-#include "pclviewer_gui.h"
-#include "ui_pclviewer_gui.h"
+#include <mgui/guis/pclviewer_gui.h>
+#include <mgui/guis/ui_pclviewer_gui.h>
 
 //---------------------------------------------------------------------------------------------------------------------
 // PUBLIC 
@@ -22,16 +22,10 @@ PCLViewer_gui::PCLViewer_gui(QWidget *parent) :
     ui->setupUi(this);
     this->setWindowTitle("PCL viewer");
 
-    connect(ui->Delete_Spheres, SIGNAL(clicked()), this, SLOT(Delete_SpheresClicked()));
-    connect(ui->Run_waypoints, SIGNAL(clicked()), this, SLOT(runGoToWaypoints()));
-    connect(ui->Run_fly, SIGNAL(clicked()), this, SLOT(runFly()));
-    connect(ui->addWP, SIGNAL(clicked()), this, SLOT(addWaypoint()));
-    connect(ui->exportTXT, SIGNAL(clicked()), this, SLOT(exportToTXT()));
-    connect(ui->loadTXT, SIGNAL(clicked()), this, SLOT(loadFromTXT()));
-
-    connect(this, &PCLViewer_gui::poseUAVchanged , this, &PCLViewer_gui::updateObjectUAV);
-
-    mLastTimePose = std::chrono::high_resolution_clock::now();
+    connect(ui->DeleteSphere, SIGNAL(clicked()), this, SLOT(deleteSphere()));
+    connect(ui->Run_gtray, SIGNAL(clicked()), this, SLOT(run_generateTray()));
+    connect(ui->Run_sendM, SIGNAL(clicked()), this, SLOT(run_sendMision()));
+    connect(ui->AddWP, SIGNAL(clicked()), this, SLOT(addWaypoint()));
     
     }
 
@@ -74,6 +68,7 @@ bool PCLViewer_gui::configureGUI(int _argc, char **_argv)
     mDirTXT = mConfigFile["dir_txt"].GetString();
     
     mTypePoint = mConfigFile["type_point"].GetString();
+
     mNameCallbackPose = mConfigFile["callback_pose"].GetString();
 
     mTypeModelPose = mConfigFile["type_model_pose"].GetString();
@@ -90,10 +85,6 @@ bool PCLViewer_gui::configureGUI(int _argc, char **_argv)
         return false;
     }
     
-    ros::NodeHandle nh;
-    mWPReq 	= nh.serviceClient<pointcloudGUI::WaypointsData>("/pcl_gui/waypoints_req");
-    mFlyReq = nh.serviceClient<std_srvs::SetBool>("/pcl_gui/fly_req");
-
     return true;
 }
 
@@ -102,104 +93,15 @@ bool PCLViewer_gui::configureGUI(int _argc, char **_argv)
 //---------------------------------------------------------------------------------------------------------------------
 
 //---------------------------------------------------------------------------------------------------------------------
-void PCLViewer_gui::exportToTXT(){
+void PCLViewer_gui::deleteSphere(){
     
-    std::ofstream waypointsFile;
-    waypointsFile.open("waypoints_exported.txt");
+    //mWayPoints.clear();
 
-    for(unsigned i = 0; i < mWayPoints.size(); i++){
-
-        int id = mWayPoints[i].first;
-
-        double x = mWayPoints[i].second[0];
-        double y = mWayPoints[i].second[1];
-        double z = mWayPoints[i].second[2];
-        double qx = mWayPoints[i].second[3];
-        double qy = mWayPoints[i].second[4];
-        double qz = mWayPoints[i].second[5];
-        double qw = mWayPoints[i].second[6];
-
-        std::string sfile = std::to_string(id) + " " + std::to_string(x) + " " + std::to_string(y) + " " + std::to_string(qx) + " " + std::to_string(qy) + " " + std::to_string(qz) + " " + std::to_string(qw) + "\n";
-        waypointsFile << sfile;
-
-    }
-
-    waypointsFile.close();
-}
-
-//---------------------------------------------------------------------------------------------------------------------
-void PCLViewer_gui::loadFromTXT(){
-    
-    std::string line_;
-    std::ifstream file_("waypoints_toImport.txt");
-    if(file_.is_open()){
-        while(std::getline(file_, line_)){
-
-            std::vector<std::string> tokens;
-		    split(line_, tokens, ' ');
-
-            float x, y, z, qx, qy, qz, qw, id;
-            std::stringstream ssX, ssY, ssZ, ssQX, ssQY, ssQZ, ssQW, ssId;
-            ssId << tokens[0]; ssId >> id;
-            ssX << tokens[1]; ssX >> x;
-            ssY << tokens[2]; ssY >> y;
-            ssZ << tokens[3]; ssZ >> z;
-            ssQX << tokens[4]; ssQX >> qx;
-            ssQY << tokens[5]; ssQY >> qy;
-            ssQZ << tokens[6]; ssQZ >> qz;
-            ssQW << tokens[7]; ssQW >> qw;
-
-            std::vector<double> point = {x, y, z, qx, qy, qz, qw};
-            mWayPoints.push_back(std::make_pair((int)id, point));
-
-            std::string swaypoint = "ID: " + std::to_string(id) + " , " + "X: " + std::to_string(x) + " , " +  "Y: " + std::to_string(y) + " , " + "Z: " + std::to_string(z) + " , " + "QX: " + std::to_string(qx) + " , " + "QY: " + std::to_string(qy) + " , " + "QZ: " + std::to_string(qz) + " , " + "QW: " + std::to_string(qw);
-            ui->listWidget_WayPoints->addItem(QString::fromStdString(swaypoint));
-
-            QString qRadSphere;
-            qRadSphere = ui->lineEdit_RadSphere->text();
-            double radSphere;
-            radSphere = qRadSphere.toDouble(); 
-
-            std::string sSphere = "sphere" + std::to_string(mContSpheres);
-            //std::cout << "sSphere: " << sSphere << std::endl;
-            PointT1 pclPoint;
-            PointT2 pclPointRGB;
-            pclPoint.x = x;
-            pclPoint.y = y;
-            pclPoint.z = z;
-            pclPointRGB.x = x;
-            pclPointRGB.y = y;
-            pclPointRGB.z = z;
-            pclPointRGB.r = 1;
-            pclPointRGB.g = 0;
-            pclPointRGB.b = 0;
-
-            if(mTypePoint == "PointXYZ"){
-                mViewer->addSphere(pclPoint, radSphere, 1, 0, 0, sSphere);
-                ui->qvtkWidget->update();
-            }else if(mTypePoint == "PointXYZRGB"){
-                mViewer->addSphere(pclPointRGB, radSphere, 1, 0, 0, sSphere);
-                ui->qvtkWidget->update();
-            }
-            mContSpheres++;
-
-        }
-        file_.close();
-    }else{
-        std::cout << "File NOT open" << std::endl;
-    }
-}
-
-//---------------------------------------------------------------------------------------------------------------------
-void PCLViewer_gui::Delete_SpheresClicked(){
-    
-    mWayPoints.clear();
-
-    for(int i = 0; i < mContSpheres; i++){
-        std::string removeSphere = "sphere" + std::to_string(i);
-        mViewer->removeShape(removeSphere);
-    }
-    mContSpheres = 1;
+    // for(int i = 0; i < mContSpheres; i++){
+    //     std::string removeSphere = "sphere" + std::to_string(i);
+    //     mViewer->removeShape(removeSphere);
+    // }
+    // mContSpheres = 1;
     ui->qvtkWidget->update();
 
 }
@@ -226,60 +128,19 @@ void PCLViewer_gui::addWaypoint(){
     std::vector<double> point = {x, y, z, xq, yq, zq, wq};
     mWayPoints.push_back(std::make_pair(id, point));
 
-    std::string swaypoint = "ID: " + std::to_string(id) + " , " + "X: " + std::to_string(x) + " , " +  "Y: " + std::to_string(y) + " , " + "Z: " + std::to_string(z) + " , " + "QX: " + std::to_string(xq) + " , " + "QY: " + std::to_string(yq) + " , " + "QZ: " + std::to_string(zq) + " , " + "QW: " + std::to_string(wq);
-    
-    ui->listWidget_WayPoints->addItem(QString::fromStdString(swaypoint));
+}
+
+//---------------------------------------------------------------------------------------------------------------------
+void PCLViewer_gui::run_generateTray(){
+
+
 
 }
 
 //---------------------------------------------------------------------------------------------------------------------
-void PCLViewer_gui::runGoToWaypoints(){
+void PCLViewer_gui::run_sendMision(){
 
-    pointcloudGUI::WaypointsData srv;
-    srv.request.req = true;
-
-    for(unsigned i = 0; i < mWayPoints.size(); i++){
-        geometry_msgs::PoseStamped pose;
-        pose.header.seq = mWayPoints[i].first;
-        pose.pose.position.x = mWayPoints[i].second[0];
-        pose.pose.position.y = mWayPoints[i].second[1];
-        pose.pose.position.z = mWayPoints[i].second[2];
-        pose.pose.orientation.x = mWayPoints[i].second[3];
-        pose.pose.orientation.y = mWayPoints[i].second[4];
-        pose.pose.orientation.z = mWayPoints[i].second[5];
-        pose.pose.orientation.w = mWayPoints[i].second[6];
-        srv.request.poseWP.push_back(pose);
-    }
     
-    if(mWPReq.call(srv)){
-        if(srv.response.success){
-            std::cout << "Service of Send Waypoints success" << std::endl;
-        }else{
-            std::cout << "Service of Send Waypoints failed" << std::endl;
-        }
-    }else{
-        std::cout << "Failed to call service of Send Waypoints" << std::endl;
-        
-    }	
-
-}
-
-//---------------------------------------------------------------------------------------------------------------------
-void PCLViewer_gui::runFly(){
-
-    std_srvs::SetBool srv;
-    srv.request.data = true;
-    
-    if(mFlyReq.call(srv)){
-        if(srv.response.success){
-            std::cout << "Service of Fly success" << std::endl;
-        }else{
-            std::cout << "Service of Fly failed" << std::endl;
-        }
-    }else{
-        std::cout << "Failed to call service of Fly" << std::endl;
-        
-    }	    
 
 }
 
@@ -361,8 +222,7 @@ bool PCLViewer_gui::extractPointCloud(std::string _dir)
         
         mViewer->addPolygonMesh(mUntransformedUav, "uav_pose");
         ui->qvtkWidget->update();
-        ros::NodeHandle nh;
-        mPoseSubscriber = nh.subscribe(mNameCallbackPose, 1, &PCLViewer_gui::CallbackPose, this);
+    
 
     }
 
@@ -459,28 +319,6 @@ void PCLViewer_gui::pointPickingOccurred(const pcl::visualization::PointPickingE
     ui->lineEdit_MX->setText(QString::number(x));
     ui->lineEdit_MY->setText(QString::number(y));
     ui->lineEdit_MZ->setText(QString::number(z));
-
-}
-
-//---------------------------------------------------------------------------------------------------------------------
-void PCLViewer_gui::CallbackPose(const geometry_msgs::PoseStamped::ConstPtr& _msg){
-    
-    mObjectLock.lock();
-    mPoseX = _msg->pose.position.x;
-    mPoseY = _msg->pose.position.y;
-    mPoseZ = _msg->pose.position.z;
-    mPoseOX = _msg->pose.orientation.x;
-    mPoseOY = _msg->pose.orientation.y;
-    mPoseOZ = _msg->pose.orientation.z;
-    mPoseOW = _msg->pose.orientation.w;
-    mObjectLock.unlock();
-
-    auto t1 = std::chrono::high_resolution_clock::now();
-     if(std::chrono::duration_cast<std::chrono::milliseconds>(t1 - mLastTimePose).count() > 100){
-        emit poseUAVchanged(); 
-    }
-    
-    mLastTimePose = t1;
 
 }
 
