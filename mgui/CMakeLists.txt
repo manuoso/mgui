@@ -49,6 +49,12 @@ endif()
 ## Load Marble
 find_package(Marble REQUIRED)
 
+# Load rapidjson
+find_package(RapidJSON REQUIRED)
+
+## Load fastcom
+find_package(fastcom REQUIRED)
+
 ## Load Qt
 find_package(Qt5Widgets REQUIRED)
 find_package(Qt5PrintSupport REQUIRED)
@@ -102,3 +108,8 @@ target_link_libraries(${PROJECT_NAME} LINK_PUBLIC ${PCL_LIBRARIES})
 target_include_directories(${PROJECT_NAME} PUBLIC "/usr/include/eigen3")
 
 target_link_libraries(${PROJECT_NAME} ${QT5_LIBRARIES})
+
+target_include_directories(${PROJECT_NAME} PUBLIC ${RAPIDJSON_INCLUDE_DIRS})
+target_link_libraries(${PROJECT_NAME} LINK_PUBLIC ${RAPIDJSON_LIBRARIES})
+
+target_link_libraries(${PROJECT_NAME} PRIVATE fastcom::fastcom)

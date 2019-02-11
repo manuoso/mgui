@@ -19,6 +19,9 @@
 
 #include <marble/MarbleWidget.h>
 
+#include <fastcom/Subscriber.h>
+#include <fastcom/Publisher.h>
+
 namespace Ui{
     class UAV_gui;
 }

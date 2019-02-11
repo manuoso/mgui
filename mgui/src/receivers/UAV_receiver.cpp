@@ -31,12 +31,82 @@ bool UAV_receiver::init(int _argc, char**_argv) {
         return false;
     }
 
-    int id = mConfigFile["id"].GetInt();
-    std::string key = mConfigFile["key"].GetString();
-    std::string port = mConfigFile["port"].GetString();
-    int baudrate = mConfigFile["baudrate"].GetInt();
-	    
-    mTelemThread = std::thread(&UAV_receiver::telemetryThread, this);
+    std::string ip = mConfigFile["ip"].GetString();
+    int portData = mConfigFile["portData"].GetInt();
+    int portState = mConfigFile["portState"].GetInt();
+    int portPose = mConfigFile["portPose"].GetInt();
+
+    // Initialize Fastcom publishers and subscribers
+    mSubsData = new fastcom::Subscriber<command>(ip, portData);
+    mPubState = new fastcom::Publisher<std::string>(portState);
+    mPubPose = new fastcom::Publisher<pose>(portPose);
+
+    // Callback of received commands
+    mSubsData->attachCallback([&](command &_data){
+        if(_data.type == "takeoff"){
+            mState = eState::TAKEOFF;
+            mHeight = _data.height;
+        }else if(_data.type == "land"){
+            mState = eState::LAND;
+        }else if(_data.type == "waypoint"){
+            mState = eState::MOVE;
+            mX = _data.x;
+            mY = _data.y;
+            mZ = _data.z;
+        }else if(_data.type == "velocity"){
+            mState = eState::MOVE_VEL;
+            mX = _data.x;
+            mY = _data.y;
+            mZ = _data.z;
+        }else if(_data.type == "wait"){
+            mState = eState::WAIT;
+        }else{
+            std::cout << "Unrecognized state" << std::endl;
+            mState = eState::WAIT;
+        }
+    });
+
+    // Publisher State thread
+    mStateThread = std::thread([&](){
+        while(!mFin){
+            std::string msg;
+            switch(mState){
+                case eState::WAIT:
+                    msg = "WAIT";
+                    break;
+                case eState::TAKEOFF:
+                    msg = "TAKEOFF";
+                    break;
+                case eState::LAND:
+                    msg = "LANDING";
+                    break;
+                case eState::MOVE:
+                    msg = "MOVE_POSITION";
+                    break;
+                case eState::MOVE_VEL:
+                    msg = "MOVE_VELOCITY";
+                    break;
+            }
+            mPubState->publish(msg);
+            std::this_thread::sleep_for(std::chrono::milliseconds(30));
+        }
+    });
+
+    // Publisher State thread
+    mPoseThread = std::thread([&](){
+        while(!mFin){
+            mSecureLock.lock();
+            // Get pose from UAL
+            
+            mSecureLock.unlock();
+            pose sendPose;
+            sendPose.x = 0;
+            sendPose.y = 0;
+            sendPose.z = 0;
+            mPubPose->publish(sendPose);
+            std::this_thread::sleep_for(std::chrono::milliseconds(30));
+        }
+    });
 
     mState = eState::WAIT;
 
@@ -46,58 +116,46 @@ bool UAV_receiver::init(int _argc, char**_argv) {
 //---------------------------------------------------------------------------------------------------------------------
 bool UAV_receiver::run() {
 
-    bool fin = false;
-    while(fin == false && ros::ok()){
+    while(!mFin){
         switch (mState) {
             case eState::WAIT:
-            {
-                
+            {   
+
+                std::this_thread::sleep_for(std::chrono::milliseconds(100)); 
+
                 break;
             }
             case eState::TAKEOFF:
             {   
 
-                
+                mState = eState::WAIT;
                 break;
             }
             case eState::LAND:
             {   
                 
+                mState = eState::WAIT;
                 break;
             }
             case eState::MOVE:
             {   
-                
+
                 break;
             }
             case eState::MOVE_VEL:
             {   
-                
+
                 break;
             }
             case eState::EXIT:
+            {
                 std::cout << "State EXIT" << std::endl;
                 std::cout << "\nEXIT..." << std::endl;
-                mFinishThreadTelem = true;
-                mTelemThread.join();
-                fin = true;
+                mFin = true;
                 break;
-        }
+            }
+        }   
     }
 
-    return true;
-
-}
-
-//---------------------------------------------------------------------------------------------------------------------
-bool UAV_receiver::telemetryThread() {
-
-    while (mFinishThreadTelem == false && ros::ok()) { 
-
-        
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        
-    }
-    
     return true;
 }

@@ -8,12 +8,16 @@
 
 #include <iostream>
 #include <stdio.h>
+#include <fstream>
 #include <chrono>
 #include <stdlib.h>
 #include <mutex>
 #include <thread>
 
 #include <rapidjson/document.h>
+
+#include <fastcom/Subscriber.h>
+#include <fastcom/Publisher.h>
 
 class UAV_receiver
 {
@@ -29,6 +33,20 @@ class UAV_receiver
         EXIT
     };
 
+    struct command{
+        std::string type;
+        float height;
+        float x;
+        float y;
+        float z;
+    };
+
+    struct pose{
+        float x;
+        float y;
+        float z;
+    };
+
     /// Init 
     /// \param _argc: argc from main
     /// \param _argv: argv from main
@@ -38,18 +56,18 @@ class UAV_receiver
     bool run();
 
   private:
-    /// Get telemetry
-    bool telemetryThread();
-
-  private:
     eState mState;
 
-    
-    dal::Backend::dataTelemetry mDataTelem;
     rapidjson::Document mConfigFile;
 
-    std::mutex mSecureLock;
-    std::thread mTelemThread, mSendThread;
+    fastcom::Subscriber<command> *mSubsData;
+    fastcom::Publisher<std::string> *mPubState;
+    fastcom::Publisher<pose> *mPubPose;
 
-    bool mFinishThreadTelem = false;
+    float mHeight, mX, mY, mZ; 
+
+    std::thread mStateThread, mPoseThread;
+    std::mutex mSecureLock;
+
+    bool mFin = false;
 };
