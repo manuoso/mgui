@@ -19,7 +19,7 @@
 
 #include <marble/MarbleWidget.h>
 
-namespace Ui {
+namespace Ui{
     class UAV_gui;
 }
 

@@ -7,7 +7,7 @@
 /////////////////////////////////////////////////////////////////
 
 #include <mgui/guis/uav_gui.h>
-#include <mgui/guis/ui_uav_gui.h>
+#include <mgui/ui_uav_gui.h>
 
 //---------------------------------------------------------------------------------------------------------------------
 // PUBLIC 
@@ -85,7 +85,7 @@ void UAV_gui::land(){
 }
 
 //---------------------------------------------------------------------------------------------------------------------
-void run_gpsPose(){
+void UAV_gui::run_gpsPose(){
 
 
 
@@ -94,14 +94,14 @@ void run_gpsPose(){
 //---------------------------------------------------------------------------------------------------------------------
 void UAV_gui::run_localPose(){
 
-    ui->lineEdit_j1->setText(QString::number( ));
-    ui->lineEdit_j2->setText(QString::number( ));
-    ui->lineEdit_j3->setText(QString::number( ));
+    //ui->lineEdit_j1->setText(QString::number( ));
+    //ui->lineEdit_j2->setText(QString::number( ));
+    //ui->lineEdit_j3->setText(QString::number( ));
 
 }
 
 //---------------------------------------------------------------------------------------------------------------------
-void add_localPose(){
+void UAV_gui::add_localPose(){
 
 
 
@@ -124,30 +124,29 @@ void UAV_gui::add_customPose()
 }
 
 //---------------------------------------------------------------------------------------------------------------------
-void run_velocity(){
+void UAV_gui::run_velocity(){
 
 
 
 }
 
 //---------------------------------------------------------------------------------------------------------------------
-void stop_velocity(){
+void UAV_gui::stop_velocity(){
 
 
 
 }
 
 //---------------------------------------------------------------------------------------------------------------------
-void run_waypoints(){
+void UAV_gui::run_waypoints(){
 
 
 
 }
 
 //---------------------------------------------------------------------------------------------------------------------
-void delete_waypoints(){
+void UAV_gui::delete_waypoints(){
 
 
 
 }
-

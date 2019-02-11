@@ -52,32 +52,32 @@ find_package(Marble REQUIRED)
 ## Load Qt
 find_package(Qt5Widgets REQUIRED)
 find_package(Qt5PrintSupport REQUIRED)
-find_package(Qt5Sql REQUIRED)
+find_package(Qt5Core REQUIRED)
 
-set(QT5_LIBRARIES Qt5::Widgets Qt5::PrintSupport Qt5::Sql)
+set(QT5_LIBRARIES Qt5::Widgets Qt5::PrintSupport Qt5::Core)
 
 # set(CMAKE_AUTOMOC ON)
 # set(CMAKE_AUTOUIC ON)
 # set(CMAKE_AUTORCC ON)
 # set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
-set(SOURCES_QT
-	src/guis/uav_gui.cpp
-	src/guis/pclviewer_gui.cpp
-)
+# set(SOURCES_QT
+# 	src/guis/uav_gui.cpp
+# 	src/guis/pclviewer_gui.cpp
+# )
 
-set(HEADERS_QT
-	include/mgui/guis/uav_gui.h
-	include/mgui/guis/pclviewer_gui.h
-)
+# set(HEADERS_QT
+# 	include/mgui/guis/uav_gui.h
+# 	include/mgui/guis/pclviewer_gui.h
+# )
 
 set(UI_SOURCES_QT
 	include/mgui/guis/uav_gui.ui
 	include/mgui/guis/pclviewer_gui.ui
 )
 
-QT5_WRAP_CPP(libraries_gui_HEADERS_MOC ${HEADERS_QT})
-QT5_WRAP_UI(libraries_gui_FORMS_HEADERS ${UI_SOURCES_QT})
+# QT5_WRAP_CPP(MOC_SRCS ${HEADERS_QT})
+QT5_WRAP_UI(UI_HEADERS ${UI_SOURCES_QT})
 
 #########################################
 ######			Executable		   ######
@@ -87,7 +87,7 @@ QT5_WRAP_UI(libraries_gui_FORMS_HEADERS ${UI_SOURCES_QT})
 file(GLOB_RECURSE SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp)
 
 # Set HEADERS variable
-file(GLOB_RECURSE HEADERS ${CMAKE_CURRENT_SOURCE_DIR}/include/*.h)
+# file(GLOB_RECURSE HEADERS ${CMAKE_CURRENT_SOURCE_DIR}/include/*.h)
 
 # Includes directories
 GroupSources(src)

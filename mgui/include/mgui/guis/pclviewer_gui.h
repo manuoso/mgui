@@ -32,16 +32,13 @@
 
 #include <vtkRenderWindow.h>
 
-#include <pcl_ros/point_cloud.h>
-#include <pcl_conversions/pcl_conversions.h>
-
 typedef pcl::PointXYZ PointT1;
 typedef pcl::PointCloud<PointT1> PointCloudT1;
 
 typedef pcl::PointXYZRGB PointT2;
 typedef pcl::PointCloud<PointT2> PointCloudT2;
 
-namespace Ui {
+namespace Ui{
     class PCLViewer_gui;
 }
 
