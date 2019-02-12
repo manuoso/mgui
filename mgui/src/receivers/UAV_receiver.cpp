@@ -32,17 +32,17 @@ bool UAV_receiver::init(int _argc, char**_argv) {
     }
 
     std::string ip = mConfigFile["ip"].GetString();
-    int portData = mConfigFile["portData"].GetInt();
+    int portCommand = mConfigFile["portCommand"].GetInt();
     int portState = mConfigFile["portState"].GetInt();
     int portPose = mConfigFile["portPose"].GetInt();
 
     // Initialize Fastcom publishers and subscribers
-    mSubsData = new fastcom::Subscriber<command>(ip, portData);
+    mSubsCommand = new fastcom::Subscriber<command>(ip, portCommand);
     mPubState = new fastcom::Publisher<std::string>(portState);
     mPubPose = new fastcom::Publisher<pose>(portPose);
 
     // Callback of received commands
-    mSubsData->attachCallback([&](command &_data){
+    mSubsCommand->attachCallback([&](command &_data){
         if(_data.type == "takeoff"){
             mState = eState::TAKEOFF;
             mHeight = _data.height;
@@ -88,17 +88,15 @@ bool UAV_receiver::init(int _argc, char**_argv) {
                     break;
             }
             mPubState->publish(msg);
-            std::this_thread::sleep_for(std::chrono::milliseconds(30));
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));
         }
     });
 
-    // Publisher State thread
+    // Publisher Pose thread
     mPoseThread = std::thread([&](){
         while(!mFin){
-            mSecureLock.lock();
             // Get pose from UAL
             
-            mSecureLock.unlock();
             pose sendPose;
             sendPose.x = 0;
             sendPose.y = 0;

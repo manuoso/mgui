@@ -60,7 +60,7 @@ class UAV_receiver
 
     rapidjson::Document mConfigFile;
 
-    fastcom::Subscriber<command> *mSubsData;
+    fastcom::Subscriber<command> *mSubsCommand;
     fastcom::Publisher<std::string> *mPubState;
     fastcom::Publisher<pose> *mPubPose;
 
