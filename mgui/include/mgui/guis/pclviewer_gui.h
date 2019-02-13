@@ -59,9 +59,6 @@ public:
     bool configureGUI(int _argc, char **_argv);
 
 private slots:
-    /// Slot for delete sphere in PCL GUI
-    void deleteSphere();
-
     /// Slot that add waypoint into a vector of waypoints
     void addWaypoint();
 
@@ -70,6 +67,9 @@ private slots:
 
     /// Slot that send mission
     void run_sendMision();
+
+    /// Slot for delete sphere in PCL GUI
+    void deleteSphere();
 
 private:
     /// Method for extract the pointcloud in TXT file, PCD or PLY
@@ -120,13 +120,15 @@ private:
     std::string mDirTXT = "";
     std::string mDirPLY = "";
     std::string mTypePoint = "";
+    std::string mTypeCallbackPose = "";
     std::string mNameCallbackPose = "";
+    int mPortCallbackPose = 0;
     std::string mTypeModelPose = "";
     std::string mPathModelPose = "";
 
     rapidjson::Document mConfigFile;
 
-    int mContSpheres = 1;
+    int mContSpheres = 0;
     bool mEndSub = false;
 
     std::vector<std::pair<int, std::vector<double>>> mWayPoints;

@@ -47,6 +47,12 @@ class UAV_receiver
         float z;
     };
 
+    struct gps{
+        float lat;
+        float lon;
+        float alt;
+    };
+
     /// Init 
     /// \param _argc: argc from main
     /// \param _argv: argv from main
@@ -63,10 +69,11 @@ class UAV_receiver
     fastcom::Subscriber<command> *mSubsCommand;
     fastcom::Publisher<std::string> *mPubState;
     fastcom::Publisher<pose> *mPubPose;
+    fastcom::Publisher<gps> *mPubGPS;
 
     float mHeight, mX, mY, mZ; 
 
-    std::thread mStateThread, mPoseThread;
+    std::thread mStateThread, mPoseThread, mGPSThread;
     std::mutex mSecureLock;
 
     bool mFin = false;

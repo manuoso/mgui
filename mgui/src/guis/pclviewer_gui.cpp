@@ -26,6 +26,8 @@ PCLViewer_gui::PCLViewer_gui(QWidget *parent) :
     connect(ui->Run_gtray, SIGNAL(clicked()), this, SLOT(run_generateTray()));
     connect(ui->Run_sendM, SIGNAL(clicked()), this, SLOT(run_sendMision()));
     connect(ui->AddWP, SIGNAL(clicked()), this, SLOT(addWaypoint()));
+
+    connect(this, &PCLViewer_gui::poseUAVchanged , this, &PCLViewer_gui::updateObjectUAV);
     
     }
 
@@ -69,7 +71,9 @@ bool PCLViewer_gui::configureGUI(int _argc, char **_argv)
     
     mTypePoint = mConfigFile["type_point"].GetString();
 
-    mNameCallbackPose = mConfigFile["callback_pose"].GetString();
+    mTypeCallbackPose = mConfigFile["type_callback"].GetString();
+    mNameCallbackPose = mConfigFile["callback_name"].GetString();
+    mPortCallbackPose = mConfigFile["callback_port"].GetInt();
 
     mTypeModelPose = mConfigFile["type_model_pose"].GetString();
     mPathModelPose = mConfigFile["model_pose"].GetString();
@@ -84,6 +88,18 @@ bool PCLViewer_gui::configureGUI(int _argc, char **_argv)
         std::cout << "ERROR! You use more than one dir" << std::endl;
         return false;
     }
+
+    if(mTypeCallbackPose == "fastcom"){
+
+
+    }else if(mTypeCallbackPose == "ros"){
+
+
+    }else{
+
+    }
+
+    mLastTimePose = std::chrono::high_resolution_clock::now();
     
     return true;
 }
@@ -91,20 +107,6 @@ bool PCLViewer_gui::configureGUI(int _argc, char **_argv)
 //---------------------------------------------------------------------------------------------------------------------
 // SLOTS
 //---------------------------------------------------------------------------------------------------------------------
-
-//---------------------------------------------------------------------------------------------------------------------
-void PCLViewer_gui::deleteSphere(){
-    
-    //mWayPoints.clear();
-
-    // for(int i = 0; i < mContSpheres; i++){
-    //     std::string removeSphere = "sphere" + std::to_string(i);
-    //     mViewer->removeShape(removeSphere);
-    // }
-    // mContSpheres = 1;
-    ui->qvtkWidget->update();
-
-}
 
 //---------------------------------------------------------------------------------------------------------------------
 void PCLViewer_gui::addWaypoint(){
@@ -121,19 +123,22 @@ void PCLViewer_gui::addWaypoint(){
     xq = 0.0;
     yq = 0.0;
     zq = 0.0;
-    wq = 0.0;
+    wq = 1.0;
 
-    int id = mContSpheres-1;
+    int id = mContSpheres;
 
     std::vector<double> point = {x, y, z, xq, yq, zq, wq};
     mWayPoints.push_back(std::make_pair(id, point));
 
+    std::string swaypoint = "ID: " + std::to_string(id) + " , " + "X: " + std::to_string(x) + " , " +  "Y: " + std::to_string(y) + " , " + "Z: " + std::to_string(z) + " , " + "QX: " + std::to_string(xq) + " , " + "QY: " + std::to_string(yq) + " , " + "QZ: " + std::to_string(zq) + " , " + "QW: " + std::to_string(wq);
+    
+    ui->listWidget_WayPoints->addItem(QString::fromStdString(swaypoint));
 }
 
 //---------------------------------------------------------------------------------------------------------------------
 void PCLViewer_gui::run_generateTray(){
 
-
+    // motion_planner
 
 }
 
@@ -141,6 +146,20 @@ void PCLViewer_gui::run_generateTray(){
 void PCLViewer_gui::run_sendMision(){
 
     
+
+}
+
+//---------------------------------------------------------------------------------------------------------------------
+void PCLViewer_gui::deleteSphere(){
+    
+    //mWayPoints.clear();
+
+    // for(int i = 0; i < mContSpheres; i++){
+    //     std::string removeSphere = "sphere" + std::to_string(i);
+    //     mViewer->removeShape(removeSphere);
+    // }
+    // mContSpheres = 0;
+    ui->qvtkWidget->update();
 
 }
 

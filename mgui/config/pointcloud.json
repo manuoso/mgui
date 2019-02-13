@@ -1,0 +1,13 @@
+{	
+	"save_pcd_ply":false,
+	"use_ply":true,
+	"dir_ply":"/home/polux/programming/catkin_pclgui/src/pointcloudGUI/bridges/Bridge_Algodonales.ply",
+	"use_pcd":false,
+	"dir_pcd":"/home/polux/programming/catkin_pclgui/src/pointcloudGUI/bridges/Bridge_Algodonales.pcd",
+	"use_txt":false,
+	"dir_txt":"/home/polux/programming/catkin_pclgui/src/pointcloudGUI/bridges/AlgodonalesAerob.pts",
+	"type_point":"PointXYZRGB",
+	"callback_pose":"/uav_1/mavros/local_position/pose",
+	"type_model_pose":"STL",
+	"model_pose":"/home/polux/programming/catkin_pclgui/src/pointcloudGUI/uav_models/arbi.stl"
+}

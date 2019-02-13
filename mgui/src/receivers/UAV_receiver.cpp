@@ -31,15 +31,21 @@ bool UAV_receiver::init(int _argc, char**_argv) {
         return false;
     }
 
-    std::string ip = mConfigFile["ip"].GetString();
+    std::string ip = mConfigFile["ip_receiver"].GetString();
     int portCommand = mConfigFile["portCommand"].GetInt();
     int portState = mConfigFile["portState"].GetInt();
     int portPose = mConfigFile["portPose"].GetInt();
+    int portGPS = mConfigFile["portGPS"].GetInt();
+
+    // Init UAV controller
+
+
 
     // Initialize Fastcom publishers and subscribers
     mSubsCommand = new fastcom::Subscriber<command>(ip, portCommand);
     mPubState = new fastcom::Publisher<std::string>(portState);
     mPubPose = new fastcom::Publisher<pose>(portPose);
+    mPubGPS = new fastcom::Publisher<gps>(portGPS);
 
     // Callback of received commands
     mSubsCommand->attachCallback([&](command &_data){
@@ -48,7 +54,7 @@ bool UAV_receiver::init(int _argc, char**_argv) {
             mHeight = _data.height;
         }else if(_data.type == "land"){
             mState = eState::LAND;
-        }else if(_data.type == "waypoint"){
+        }else if(_data.type == "position"){
             mState = eState::MOVE;
             mX = _data.x;
             mY = _data.y;
@@ -95,13 +101,27 @@ bool UAV_receiver::init(int _argc, char**_argv) {
     // Publisher Pose thread
     mPoseThread = std::thread([&](){
         while(!mFin){
-            // Get pose from UAL
+            // Get pose
             
             pose sendPose;
             sendPose.x = 0;
             sendPose.y = 0;
             sendPose.z = 0;
             mPubPose->publish(sendPose);
+            std::this_thread::sleep_for(std::chrono::milliseconds(30));
+        }
+    });
+
+    // Publisher GPS thread
+    mGPSThread = std::thread([&](){
+        while(!mFin){
+            // Get gps
+
+            gps sendGPS;
+            sendGPS.lat = 0;
+            sendGPS.lon = 0;
+            sendGPS.alt = 0;
+            mPubGPS->publish(sendGPS);
             std::this_thread::sleep_for(std::chrono::milliseconds(30));
         }
     });

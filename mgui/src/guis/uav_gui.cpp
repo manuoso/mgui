@@ -24,6 +24,7 @@ UAV_gui::UAV_gui(QWidget *parent) :
     connect(ui->land, SIGNAL(clicked()), this, SLOT(land()));
 
     connect(ui->Run_gps, SIGNAL(clicked()), this, SLOT(run_gpsPose()));
+    connect(ui->Stop_gps, SIGNAL(clicked()), this, SLOT(stop_gpsPose()));
 
     connect(ui->Run_pose, SIGNAL(clicked()), this, SLOT(run_localPose()));
     connect(ui->Stop_pose, SIGNAL(clicked()), this, SLOT(stop_localPose()));
@@ -37,8 +38,9 @@ UAV_gui::UAV_gui(QWidget *parent) :
     connect(ui->Run_waypoints, SIGNAL(clicked()), this, SLOT(run_waypoints()));
     connect(ui->DeleteWP, SIGNAL(clicked()), this, SLOT(delete_waypoints()));
 
-    connect(this, &UAV_gui::localPositionchanged , this, &UAV_gui::updateLocalPose);
+    connect(this, &UAV_gui::localPositionChanged , this, &UAV_gui::updateLocalPose);
     connect(this, &UAV_gui::stateChanged , this, &UAV_gui::updateState);
+    connect(this, &UAV_gui::gpsChanged , this, &UAV_gui::updateGPS);
 
     mMapWidget= new Marble::MarbleWidget();
     mMapWidget->setProjection(Marble::Mercator);
@@ -83,32 +85,45 @@ bool UAV_gui::configureGUI(int _argc, char **_argv){
         return false;
     }
 
-    std::string ip = mConfigFile["ip"].GetString();
+    std::string ip = mConfigFile["ip_sender"].GetString();
     int portCommand = mConfigFile["portCommand"].GetInt();
     int portState = mConfigFile["portState"].GetInt();
     int portPose = mConfigFile["portPose"].GetInt();
+    int portGPS = mConfigFile["portGPS"].GetInt();
 
     // Initialize Fastcom publishers and subscribers
     mPubCommand = new fastcom::Publisher<command>(portCommand);
     mSubsState = new fastcom::Subscriber<std::string>(ip, portState);
     mSubsPose = new fastcom::Subscriber<pose>(ip, portPose);
+    mSubsGPS = new fastcom::Subscriber<gps>(ip, portGPS);
 
     // Callback of received commands
     mSubsState->attachCallback([&](std::string &_data){
-	mStateUAV = _data;
-	if(mState != _data){
-		emit stateChanged(); 
-	}     
+        mStateUAV = _data;
+        if(mStateUAV != _data){
+            emit stateChanged(); 
+        }     
 
     });
 
-    // Callback of received commands
+    // Callback of received pose
     mSubsPose->attachCallback([&](pose &_data){
         mPoseUAV.x = _data.x;
-	mPoseUAV.y = _data.y;
-	mPoseUAV.z = _data.z;
+        mPoseUAV.y = _data.y;
+        mPoseUAV.z = _data.z;
 
     });
+    
+    // Callback of received gps
+    mSubsGPS->attachCallback([&](gps &_data){
+        mGPSUAV.lat = _data.lat;
+        mGPSUAV.lon = _data.lon;
+        mGPSUAV.alt = _data.alt;
+
+    });
+
+    mLastTimePose = std::chrono::high_resolution_clock::now();
+    mLastTimeGPS = std::chrono::high_resolution_clock::now();
 
     std::this_thread::sleep_for(std::chrono::seconds(1));
 
@@ -147,7 +162,30 @@ void UAV_gui::land(){
 //---------------------------------------------------------------------------------------------------------------------
 void UAV_gui::run_gpsPose(){
 
+    mPrintGPS = true;
+    mGPSThread = std::thread([&]{
+	while(mPrintGPS){
+        	auto t1 = std::chrono::high_resolution_clock::now();
+     		if(std::chrono::duration_cast<std::chrono::milliseconds>(t1 - mLastTimeGPS).count() > 50){
+        		emit gpsChanged(); 
+    		}
+    
+    		mLastTimeGPS = t1;
+	}
+	
+    });
 
+    ui->Run_gps->setVisible(0);
+    ui->Stop_gps->setVisible(1); 
+
+}
+
+//---------------------------------------------------------------------------------------------------------------------
+void UAV_gui::stop_gpsPose(){
+
+    mPrintGPS = false;
+    ui->Run_gps->setVisible(1);
+    ui->Stop_gps->setVisible(0);
 
 }
 
@@ -159,7 +197,7 @@ void UAV_gui::run_localPose(){
 	while(mPrintLocalPose){
         	auto t1 = std::chrono::high_resolution_clock::now();
      		if(std::chrono::duration_cast<std::chrono::milliseconds>(t1 - mLastTimePose).count() > 50){
-        		emit localPositionchanged(); 
+        		emit localPositionChanged(); 
     		}
     
     		mLastTimePose = t1;
@@ -195,15 +233,15 @@ void UAV_gui::run_customPose()
     z = qZ.toFloat();
 
     command msg;
-    msg.type = "waypoint";
+    msg.type = "position";
     msg.x = x;
     msg.y = y;
     msg.z = z;
     if(!mSendVelocity){
-	mPubCommand->publish(msg);
-    }else{
-	std::cout << "Cant send position while you are sending velocity" << std::endl;
-}
+        mPubCommand->publish(msg);
+        }else{
+        std::cout << "Cant send position while you are sending velocity" << std::endl;
+    }
 
 }
 
@@ -220,6 +258,14 @@ void UAV_gui::add_customPose()
     y = qY.toFloat();
     z = qZ.toFloat();
 
+    int id = mIDWP;
+    mIDWP++;
+    std::vector<double> point = {x, y, z};
+    mWayPoints.push_back(std::make_pair(id, point));
+
+    std::string swaypoint = "ID: " + std::to_string(id) + " , " + "X: " + std::to_string(x) + " , " +  "Y: " + std::to_string(y) + " , " + "Z: " + std::to_string(z);
+    
+    ui->listWidget_WayPoints->addItem(QString::fromStdString(swaypoint));
 
 }
 
@@ -258,14 +304,31 @@ void UAV_gui::stop_velocity(){
 //---------------------------------------------------------------------------------------------------------------------
 void UAV_gui::run_waypoints(){
 
-
+    for(unsigned i = 0; i < mWayPoints.size(); i++){
+        command msg;
+        msg.type = "position";
+        msg.x = mWayPoints[i].second[0];
+        msg.y = mWayPoints[i].second[1];
+        msg.z = mWayPoints[i].second[2];
+        if(!mSendVelocity){
+            mPubCommand->publish(msg);
+            }else{
+            std::cout << "Cant send position while you are sending velocity" << std::endl;
+        }
+    }
 
 }
 
 //---------------------------------------------------------------------------------------------------------------------
 void UAV_gui::delete_waypoints(){
 
+    QList<QListWidgetItem*> items = ui->listWidget_WayPoints->selectedItems();
+    foreach(QListWidgetItem * item, items){
 
+        int index = ui->listWidget_WayPoints->row(item);
+        mWayPoints.erase(mWayPoints.begin() + index);
+        delete ui->listWidget_WayPoints->takeItem(ui->listWidget_WayPoints->row(item));
+    }
 
 }
 
@@ -283,9 +346,18 @@ void UAV_gui::updateLocalPose(){
 }
 
 //---------------------------------------------------------------------------------------------------------------------
-void UAV_gui::updateLocalPose(){
+void UAV_gui::updateGPS(){
 
-    ui->lineEdit_M->setText(QString::string(mStateUAV));
+    ui->lineEdit_gps1->setText(QString::number(mGPSUAV.lat));
+    ui->lineEdit_gps2->setText(QString::number(mGPSUAV.lon));
+    ui->lineEdit_gps3->setText(QString::number(mGPSUAV.alt));
+
+}
+
+//---------------------------------------------------------------------------------------------------------------------
+void UAV_gui::updateState(){
+
+    ui->lineEdit_M->setText(QString::fromStdString(mStateUAV));
 
 }
 
