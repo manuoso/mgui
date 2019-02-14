@@ -1,0 +1,10 @@
+get_filename_component(mgui_CMAKE_DIR "${CMAKE_CURRENT_LIST_FILE}" PATH)
+include(CMakeFindDependencyMacro)
+
+if(@USE_GUI@)
+    find_package(PCL 1.8 QUIET REQUIRED)
+endif(@USE_GUI@)
+
+if(NOT TARGET mgui::mgui)
+    include("${mgui_CMAKE_DIR}/mguiTargets.cmake")
+endif()

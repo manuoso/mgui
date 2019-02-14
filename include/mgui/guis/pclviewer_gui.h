@@ -58,6 +58,10 @@ public:
     /// \return true if params are good or without errors, false if something failed
     bool configureGUI(int _argc, char **_argv);
 
+signals:
+    /// Signal that warns that there is a change in the pose of the uav
+    void poseUAVchanged();
+
 private slots:
     /// Slot that add waypoint into a vector of waypoints
     void addWaypoint();
