@@ -31,6 +31,9 @@ set(USE_GUI ON)
 
 # Receivers
 set(USE_REC ON)
+
+# Others
+set(BUILD_TOOLS ON)
 set(USE_CATKIN ON)
 
 #########################################
@@ -195,9 +198,9 @@ endif(${catkin_FOUND})
 ######		   	Tools 		   	   ######
 #########################################
 
-# if(${BUILD_TOOLS})
-# 	add_subdirectory(tools)
-# endif(${BUILD_TOOLS})
+if(${BUILD_TOOLS})
+	add_subdirectory(tools)
+endif(${BUILD_TOOLS})
 
 #########################################
 ######			Examples 		   ######
