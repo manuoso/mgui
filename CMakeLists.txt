@@ -124,10 +124,10 @@ endif()
 #########################################
 # catking
 if(${USE_CATKIN})
-	find_package(catkin REQUIRED roscpp)
+	find_package(catkin REQUIRED roscpp uav_abstraction_layer)
 	if(${catkin_FOUND})
 		catkin_package(
-			CATKIN_DEPENDS roscpp
+			CATKIN_DEPENDS roscpp uav_abstraction_layer
 			INCLUDE_DIRS include
 		)
 		list(APPEND MGUI_DEFINITIONS "MGUI_USE_ROS")
@@ -174,7 +174,7 @@ endif()
 
 if(${catkin_FOUND})
 	target_include_directories(${PROJECT_NAME} PUBLIC ${catkin_INCLUDE_DIRS})
-	target_link_libraries(${PROJECT_NAME} LINK_PUBLIC ${catkin_LIBRARIES} )
+	target_link_libraries(${PROJECT_NAME} LINK_PUBLIC ${catkin_LIBRARIES})
 	add_dependencies(${PROJECT_NAME} ${catkin_EXPORTED_TARGETS})
 endif(${catkin_FOUND})
 

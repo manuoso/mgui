@@ -27,6 +27,9 @@
 #include <mutex>
 #include <thread>
 
+#include <ros/ros.h>
+#include <uav_abstraction_layer/ual.h>
+
 #include <rapidjson/document.h>
 
 #include <fastcom/Subscriber.h>
@@ -60,12 +63,6 @@ class UAV_receiver
         float z;
     };
 
-    struct gps{
-        float lat;
-        float lon;
-        float alt;
-    };
-
     /// Init 
     /// \param _argc: argc from main
     /// \param _argv: argv from main
@@ -79,14 +76,16 @@ class UAV_receiver
 
     rapidjson::Document mConfigFile;
 
+    grvc::ual::UAL *mUAL;
+
     fastcom::Subscriber<command> *mSubsCommand;
     fastcom::Publisher<std::string> *mPubState;
     fastcom::Publisher<pose> *mPubPose;
-    fastcom::Publisher<gps> *mPubGPS;
+    fastcom::Publisher<pose> *mPubVel;
 
     float mHeight, mX, mY, mZ; 
 
-    std::thread mStateThread, mPoseThread, mGPSThread;
+    std::thread mStateThread, mPoseThread, mVelThread;
     std::mutex mSecureLock;
 
     bool mFin = false;

@@ -48,17 +48,16 @@ bool UAV_receiver::init(int _argc, char**_argv) {
     int portCommand = mConfigFile["portCommand"].GetInt();
     int portState = mConfigFile["portState"].GetInt();
     int portPose = mConfigFile["portPose"].GetInt();
-    int portGPS = mConfigFile["portGPS"].GetInt();
+    int portVel = mConfigFile["portVel"].GetInt();
 
     // Init UAV controller
-
-
+    mUAL = new grvc::ual::UAL(_argc, _argv);
 
     // Initialize Fastcom publishers and subscribers
     mSubsCommand = new fastcom::Subscriber<command>(ip, portCommand);
     mPubState = new fastcom::Publisher<std::string>(portState);
     mPubPose = new fastcom::Publisher<pose>(portPose);
-    mPubGPS = new fastcom::Publisher<gps>(portGPS);
+    mPubVel = new fastcom::Publisher<pose>(portVel);
 
     // Callback of received commands
     mSubsCommand->attachCallback([&](command &_data){
@@ -79,6 +78,8 @@ bool UAV_receiver::init(int _argc, char**_argv) {
             mZ = _data.z;
         }else if(_data.type == "wait"){
             mState = eState::WAIT;
+        }else if(_data.type == "emergency"){
+            mState = eState::EXIT;
         }else{
             std::cout << "Unrecognized state" << std::endl;
             mState = eState::WAIT;
@@ -87,7 +88,7 @@ bool UAV_receiver::init(int _argc, char**_argv) {
 
     // Publisher State thread
     mStateThread = std::thread([&](){
-        while(!mFin){
+        while(!mFin && ros::ok()){
             std::string msg;
             switch(mState){
                 case eState::WAIT:
@@ -105,6 +106,9 @@ bool UAV_receiver::init(int _argc, char**_argv) {
                 case eState::MOVE_VEL:
                     msg = "MOVE_VELOCITY";
                     break;
+                case eState::EXIT:
+                    msg = "EXIT";
+                    break;
             }
             mPubState->publish(msg);
             std::this_thread::sleep_for(std::chrono::milliseconds(50));
@@ -113,28 +117,30 @@ bool UAV_receiver::init(int _argc, char**_argv) {
 
     // Publisher Pose thread
     mPoseThread = std::thread([&](){
-        while(!mFin){
+        while(!mFin && ros::ok()){
             // Get pose
-            
+            grvc::ual::Pose p = mUAL->pose();
+
             pose sendPose;
-            sendPose.x = 0;
-            sendPose.y = 0;
-            sendPose.z = 0;
+            sendPose.x = p.pose.position.x;
+            sendPose.y = p.pose.position.y;
+            sendPose.z = p.pose.position.z;
             mPubPose->publish(sendPose);
             std::this_thread::sleep_for(std::chrono::milliseconds(30));
         }
     });
 
-    // Publisher GPS thread
-    mGPSThread = std::thread([&](){
-        while(!mFin){
-            // Get gps
+    // Publisher Velocity thread
+    mVelThread = std::thread([&](){
+        while(!mFin && ros::ok()){
+            // Get velocity
+            grvc::ual::Velocity v = mUAL->velocity();
 
-            gps sendGPS;
-            sendGPS.lat = 0;
-            sendGPS.lon = 0;
-            sendGPS.alt = 0;
-            mPubGPS->publish(sendGPS);
+            pose sendVel;
+            sendVel.x = v.twist.linear.x;
+            sendVel.y = v.twist.linear.y;
+            sendVel.z = v.twist.linear.z;
+            mPubVel->publish(sendVel);
             std::this_thread::sleep_for(std::chrono::milliseconds(30));
         }
     });
@@ -147,42 +153,59 @@ bool UAV_receiver::init(int _argc, char**_argv) {
 //---------------------------------------------------------------------------------------------------------------------
 bool UAV_receiver::run() {
 
-    while(!mFin){
+    while(!mFin && ros::ok()){
         switch (mState) {
             case eState::WAIT:
             {   
-
                 std::this_thread::sleep_for(std::chrono::milliseconds(100)); 
-
                 break;
             }
             case eState::TAKEOFF:
             {   
-
+                mUAL->takeOff(mHeight);
                 mState = eState::WAIT;
                 break;
             }
             case eState::LAND:
             {   
-                
+                mUAL->land();
                 mState = eState::WAIT;
                 break;
             }
             case eState::MOVE:
             {   
-
+                grvc::ual::Waypoint waypoint;
+                waypoint.header.frame_id = "map";
+                waypoint.pose.position.x = mX;
+                waypoint.pose.position.y = mY;
+                waypoint.pose.position.z = mZ;
+                waypoint.pose.orientation.x = 0;
+                waypoint.pose.orientation.y = 0;
+                waypoint.pose.orientation.z = 0;
+                waypoint.pose.orientation.w = 1;
+                mUAL->goToWaypoint(waypoint);
+                mState = eState::WAIT;
                 break;
             }
             case eState::MOVE_VEL:
             {   
-
+                grvc::ual::Velocity velocity;
+                velocity.header.frame_id = "map";
+                velocity.twist.linear.x = mX;
+                velocity.twist.linear.y = mY;
+                velocity.twist.linear.z = mZ;
+                mUAL->setVelocity(velocity);
+                //mState = eState::WAIT; // Al estar comentado seguimos manteniendo la ultima velocidad en caso de que dejemos de enviar
                 break;
             }
             case eState::EXIT:
             {
                 std::cout << "State EXIT" << std::endl;
-                std::cout << "\nEXIT..." << std::endl;
                 mFin = true;
+                mStateThread.join();
+                mPoseThread.join();
+                mVelThread.join();
+                std::cout << "\nEXIT..." << std::endl;
                 break;
             }
         }   

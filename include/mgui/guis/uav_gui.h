@@ -63,18 +63,12 @@ class UAV_gui : public QMainWindow {
 		float y;
 		float z;
 	    };
-    
-    struct gps{
-        float lat;
-        float lon;
-        float alt;
-    };
 
 signals:
     /// Signal that warns that there is a change in the pose of the uav
     void localPositionChanged();
 
-    void gpsChanged();
+    void velChanged();
     
     void stateChanged();
 
@@ -83,8 +77,8 @@ signals:
         void takeOff();
         void land();
 
-        void run_gpsPose();
-        void stop_gpsPose();
+        void run_getVel();
+        void stop_getVel();
 
         void run_localPose();
         void stop_localPose();
@@ -98,10 +92,12 @@ signals:
         void run_waypoints();
         void delete_waypoints();
 
+        void emergency();
+
     private:
         void updateLocalPose();
 
-        void updateGPS();
+        void updateVel();
 
         void updateState();
 
@@ -115,20 +111,19 @@ signals:
         fastcom::Publisher<command> *mPubCommand;
         fastcom::Subscriber<std::string> *mSubsState;
         fastcom::Subscriber<pose> *mSubsPose;
-        fastcom::Subscriber<gps> *mSubsGPS;
+        fastcom::Subscriber<pose> *mSubsVel;
 
-        std::thread mVelocityThread, mLocalPoseThread, mGPSThread;
+        std::thread mVelocityThread, mLocalPoseThread, mGetVelThread;
         
-        std::chrono::time_point<std::chrono::high_resolution_clock> mLastTimePose, mLastTimeGPS;	
+        std::chrono::time_point<std::chrono::high_resolution_clock> mLastTimePose, mLastTimeVel, mLastTimeSendVel;	
         std::vector<std::pair<int, std::vector<double>>> mWayPoints;
         
         int mIDWP = 0;
         std::string mIdUAV;
         std::string mStateUAV;
-        pose mPoseUAV;
-        gps mGPSUAV;
+        pose mPoseUAV, mVelUAV, mSendVelUAV;
         bool mPrintLocalPose = false;
-        bool mPrintGPS = false;
+        bool mPrintVel = false;
         bool mSendVelocity = false;
 };
 
