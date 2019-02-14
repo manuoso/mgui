@@ -22,6 +22,19 @@ endmacro()
 
 GroupSources(src)
 
+##########################################
+######		Configure project		######
+##########################################
+
+# GUI
+set(USE_GUI_UAV ON)
+set(USE_GUI_PCL ON)
+
+# Receivers
+set(USE_REC_UAV ON)
+set(USE_CATKIN ON)
+
+
 #########################################
 ###### Loading 3rd party libraries.######
 #########################################
@@ -37,17 +50,21 @@ if(${Eigen3_FOUND})
 endif()
 
 ## Load PCL
-find_package(PCL 1.7 QUIET REQUIRED)
-if(${PCL_FOUND} AND ${VTK_FOUND} AND ${Boost_FOUND} AND ${FLANN_FOUND} STREQUAL "TRUE")
-	MESSAGE( STATUS "Adding properly PCL and its dependencies")
-	add_definitions(-DENABLE_PCL)
-	add_definitions(${PCL_DEFINITIONS})
-else()
-	MESSAGE( FATAL_ERROR "Couldnt Add PCL and/or it's dependencies")
-endif()
+if(${USE_GUI_PCL})
+	find_package(PCL 1.8 QUIET REQUIRED)
+	if(${PCL_FOUND} AND ${VTK_FOUND} AND ${Boost_FOUND} AND ${FLANN_FOUND} STREQUAL "TRUE")
+		MESSAGE( STATUS "Adding properly PCL and its dependencies")
+		add_definitions(-DENABLE_PCL)
+		add_definitions(${PCL_DEFINITIONS})
+	else()
+		MESSAGE( FATAL_ERROR "Couldnt Add PCL and/or it's dependencies")
+	endif()
+endif(${USE_GUI_PCL})
 
 ## Load Marble
-find_package(Marble REQUIRED)
+if(${USE_GUI_UAV})
+	find_package(Marble REQUIRED)
+endif(${USE_GUI_UAV})
 
 # Load rapidjson
 find_package(RapidJSON REQUIRED)
@@ -56,34 +73,47 @@ find_package(RapidJSON REQUIRED)
 find_package(fastcom REQUIRED)
 
 ## Load Qt
-find_package(Qt5Widgets REQUIRED)
-find_package(Qt5PrintSupport REQUIRED)
-find_package(Qt5Core REQUIRED)
+if((${USE_GUI_PCL} EQUAL "1") OR (${USE_GUI_UAV} EQUAL "1"))
+	find_package(Qt5Widgets REQUIRED)
+	find_package(Qt5PrintSupport REQUIRED)
+	find_package(Qt5Core REQUIRED)
 
-set(QT5_LIBRARIES Qt5::Widgets Qt5::PrintSupport Qt5::Core)
+	set(QT5_LIBRARIES Qt5::Widgets Qt5::PrintSupport Qt5::Core)
 
-# set(CMAKE_AUTOMOC ON)
-# set(CMAKE_AUTOUIC ON)
-# set(CMAKE_AUTORCC ON)
-# set(CMAKE_INCLUDE_CURRENT_DIR ON)
+	# set(CMAKE_AUTOMOC ON)
+	# set(CMAKE_AUTOUIC ON)
+	# set(CMAKE_AUTORCC ON)
+	# set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
-# set(SOURCES_QT
-# 	src/guis/uav_gui.cpp
-# 	src/guis/pclviewer_gui.cpp
-# )
+	# set(SOURCES_QT
+	# 	src/guis/uav_gui.cpp
+	# 	src/guis/pclviewer_gui.cpp
+	# )
 
-# set(HEADERS_QT
-# 	include/mgui/guis/uav_gui.h
-# 	include/mgui/guis/pclviewer_gui.h
-# )
+	# set(HEADERS_QT
+	# 	include/mgui/guis/uav_gui.h
+	# 	include/mgui/guis/pclviewer_gui.h
+	# )
 
-set(UI_SOURCES_QT
-	include/mgui/guis/uav_gui.ui
-	include/mgui/guis/pclviewer_gui.ui
-)
+	set(UI_SOURCES_QT
+		include/mgui/guis/uav_gui.ui
+		include/mgui/guis/pclviewer_gui.ui
+	)
 
-# QT5_WRAP_CPP(MOC_SRCS ${HEADERS_QT})
-QT5_WRAP_UI(UI_HEADERS ${UI_SOURCES_QT})
+	# QT5_WRAP_CPP(MOC_SRCS ${HEADERS_QT})
+	QT5_WRAP_UI(UI_HEADERS ${UI_SOURCES_QT})	
+endif()
+
+# Catking
+if(${USE_CATKIN})
+	find_package(catkin REQUIRED roscpp)
+	if(${catkin_FOUND})
+		catkin_package(
+			CATKIN_DEPENDS roscpp 
+		)
+		list(APPEND RGBD_TOOLS_DEFINITIONS "RGBDTOOLS_USE_ROS")
+	endif(${catkin_FOUND})
+endif(${USE_CATKIN})
 
 #########################################
 ######			Executable		   ######
@@ -102,14 +132,23 @@ include(${CMAKE_SOURCE_DIR}/cmake/LibraryConfig.cmake)
 
 target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
-target_include_directories(${PROJECT_NAME} PUBLIC ${PCL_INCLUDE_DIRS})
-target_link_libraries(${PROJECT_NAME} LINK_PUBLIC ${PCL_LIBRARIES})
+if(${USE_GUI_PCL})
+	target_include_directories(${PROJECT_NAME} PUBLIC ${PCL_INCLUDE_DIRS})
+	target_link_libraries(${PROJECT_NAME} LINK_PUBLIC ${PCL_LIBRARIES})
+endif(${USE_GUI_PCL})
 
 target_include_directories(${PROJECT_NAME} PUBLIC "/usr/include/eigen3")
 
-target_link_libraries(${PROJECT_NAME} ${QT5_LIBRARIES})
+if((${USE_GUI_PCL} EQUAL "1") OR (${USE_GUI_UAV} EQUAL "1"))
+	target_link_libraries(${PROJECT_NAME} ${QT5_LIBRARIES})
+endif()
 
 target_include_directories(${PROJECT_NAME} PUBLIC ${RAPIDJSON_INCLUDE_DIRS})
 target_link_libraries(${PROJECT_NAME} LINK_PUBLIC ${RAPIDJSON_LIBRARIES})
 
 target_link_libraries(${PROJECT_NAME} PRIVATE fastcom::fastcom)
+
+if(${catkin_FOUND})
+	target_include_directories(${PROJECT_NAME}  PUBLIC ${catkin_INCLUDE_DIRS})
+	target_link_libraries(${PROJECT_NAME}  LINK_PUBLIC  ${catkin_LIBRARIES})
+endif(${catkin_FOUND})
