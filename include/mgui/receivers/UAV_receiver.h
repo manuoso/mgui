@@ -49,6 +49,7 @@ class UAV_receiver
         EXIT
     };
 
+    /// Struct for send commands to the UAV
     struct command{
         std::string type;
         float height;
@@ -57,6 +58,7 @@ class UAV_receiver
         float z;
     };
 
+    /// Struct for received pose and send the velocity of the UAV
     struct pose{
         float x;
         float y;
@@ -72,21 +74,21 @@ class UAV_receiver
     bool run();
 
   private:
-    eState mState;
+    eState state_;
 
-    rapidjson::Document mConfigFile;
+    rapidjson::Document configFile_;
 
-    grvc::ual::UAL *mUAL;
+    grvc::ual::UAL *ual_;
 
-    fastcom::Subscriber<command> *mSubsCommand;
-    fastcom::Publisher<std::string> *mPubState;
-    fastcom::Publisher<pose> *mPubPose;
-    fastcom::Publisher<pose> *mPubVel;
+    fastcom::Subscriber<command> *subsCommand_;
+    fastcom::Publisher<std::string> *pubState_;
+    fastcom::Publisher<pose> *pubPose_;
+    fastcom::Publisher<pose> *pubVel_;
 
-    float mHeight, mX, mY, mZ; 
+    float height_, x_, y_, z_; 
 
-    std::thread mStateThread, mPoseThread, mVelThread;
-    std::mutex mSecureLock;
+    std::thread stateThread_, poseThread_, velThread_;
+    std::mutex secureLock_;
 
-    bool mFin = false;
+    bool fin_ = false;
 };

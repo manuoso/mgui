@@ -57,12 +57,12 @@ UAV_gui::UAV_gui(QWidget *parent) :
     connect(this, &UAV_gui::stateChanged , this, &UAV_gui::updateState);
     connect(this, &UAV_gui::velChanged , this, &UAV_gui::updateVel);
 
-    mMapWidget= new Marble::MarbleWidget();
-    mMapWidget->setProjection(Marble::Mercator);
-    mMapWidget->setMapThemeId("earth/openstreetmap/openstreetmap.dgml");
-    mMapWidget->show();
+    mapWidget_= new Marble::MarbleWidget();
+    mapWidget_->setProjection(Marble::Mercator);
+    mapWidget_->setMapThemeId("earth/openstreetmap/openstreetmap.dgml");
+    mapWidget_->show();
 
-    ui->horizontalLayout->addWidget(mMapWidget);
+    ui->horizontalLayout->addWidget(mapWidget_);
 
     ui->Run_pose->setVisible(1);
     ui->Stop_pose->setVisible(0);
@@ -95,51 +95,51 @@ bool UAV_gui::configureGUI(int _argc, char **_argv){
     strStream << rawFile.rdbuf(); //read the file
     std::string json = strStream.str(); //str holds the content of the file
 
-    if(mConfigFile.Parse(json.c_str()).HasParseError()){
+    if(configFile_.Parse(json.c_str()).HasParseError()){
         std::cout << "Error parsing json" << std::endl;
         return false;
     }
 
-    std::string ip = mConfigFile["ip_sender"].GetString();
-    int portCommand = mConfigFile["portCommand"].GetInt();
-    int portState = mConfigFile["portState"].GetInt();
-    int portPose = mConfigFile["portPose"].GetInt();
-    int portVel = mConfigFile["portVel"].GetInt();
+    std::string ip = configFile_["ip_sender"].GetString();
+    int portCommand = configFile_["portCommand"].GetInt();
+    int portState = configFile_["portState"].GetInt();
+    int portPose = configFile_["portPose"].GetInt();
+    int portVel = configFile_["portVel"].GetInt();
 
     // Initialize Fastcom publishers and subscribers
-    mPubCommand = new fastcom::Publisher<command>(portCommand);
-    mSubsState = new fastcom::Subscriber<std::string>(ip, portState);
-    mSubsPose = new fastcom::Subscriber<pose>(ip, portPose);
-    mSubsVel = new fastcom::Subscriber<pose>(ip, portVel);
+    pubCommand_ = new fastcom::Publisher<command>(portCommand);
+    subsState_ = new fastcom::Subscriber<std::string>(ip, portState);
+    subsPose_ = new fastcom::Subscriber<pose>(ip, portPose);
+    subsVel_ = new fastcom::Subscriber<pose>(ip, portVel);
 
     // Callback of received commands
-    mSubsState->attachCallback([&](std::string &_data){
-        mStateUAV = _data;
-        if(mStateUAV != _data){
+    subsState_->attachCallback([&](std::string &_data){
+        stateUAV_ = _data;
+        if(stateUAV_ != _data){
             emit stateChanged(); 
         }     
 
     });
 
     // Callback of received pose
-    mSubsPose->attachCallback([&](pose &_data){
-        mPoseUAV.x = _data.x;
-        mPoseUAV.y = _data.y;
-        mPoseUAV.z = _data.z;
+    subsPose_->attachCallback([&](pose &_data){
+        poseUAV_.x = _data.x;
+        poseUAV_.y = _data.y;
+        poseUAV_.z = _data.z;
 
     });
     
     // Callback of received velocity
-    mSubsVel->attachCallback([&](pose &_data){
-        mVelUAV.x = _data.x;
-        mVelUAV.y = _data.y;
-        mVelUAV.z = _data.z;
+    subsVel_->attachCallback([&](pose &_data){
+        velUAV_.x = _data.x;
+        velUAV_.y = _data.y;
+        velUAV_.z = _data.z;
 
     });
 
-    mLastTimePose = std::chrono::high_resolution_clock::now();
-    mLastTimeVel = std::chrono::high_resolution_clock::now();
-    mLastTimeSendVel = std::chrono::high_resolution_clock::now();
+    lastTimePose_ = std::chrono::high_resolution_clock::now();
+    lastTimeVel_ = std::chrono::high_resolution_clock::now();
+    lastTimeSendVel_ = std::chrono::high_resolution_clock::now();
 
     std::this_thread::sleep_for(std::chrono::seconds(1));
 
@@ -162,7 +162,7 @@ void UAV_gui::takeOff(){
     command msg;
     msg.type = "takeoff";
     msg.height = takeOff;
-    mPubCommand->publish(msg);
+    pubCommand_->publish(msg);
 
 }
 
@@ -171,22 +171,22 @@ void UAV_gui::land(){
 
     command msg;
     msg.type = "land";
-    mPubCommand->publish(msg);
+    pubCommand_->publish(msg);
 
 }
 
 //---------------------------------------------------------------------------------------------------------------------
 void UAV_gui::run_getVel(){
 
-    mPrintVel = true;
-    mGetVelThread = std::thread([&]{
-	while(mPrintVel){
+    printVel_ = true;
+    getVelThread_ = std::thread([&]{
+	while(printVel_){
         	auto t1 = std::chrono::high_resolution_clock::now();
-     		if(std::chrono::duration_cast<std::chrono::milliseconds>(t1 - mLastTimeVel).count() > 50){
+     		if(std::chrono::duration_cast<std::chrono::milliseconds>(t1 - lastTimeVel_).count() > 50){
         		emit velChanged(); 
     		}
     
-    		mLastTimeVel = t1;
+    		lastTimeVel_ = t1;
 	}
 	
     });
@@ -199,7 +199,7 @@ void UAV_gui::run_getVel(){
 //---------------------------------------------------------------------------------------------------------------------
 void UAV_gui::stop_getVel(){
 
-    mPrintVel = false;
+    printVel_ = false;
     ui->Run_getVel->setVisible(1);
     ui->Stop_getVel->setVisible(0);
 
@@ -208,15 +208,15 @@ void UAV_gui::stop_getVel(){
 //---------------------------------------------------------------------------------------------------------------------
 void UAV_gui::run_localPose(){
 
-    mPrintLocalPose = true;
-    mLocalPoseThread = std::thread([&]{
-	while(mPrintLocalPose){
+    printLocalPose_ = true;
+    localPoseThread_ = std::thread([&]{
+	while(printLocalPose_){
         	auto t1 = std::chrono::high_resolution_clock::now();
-     		if(std::chrono::duration_cast<std::chrono::milliseconds>(t1 - mLastTimePose).count() > 50){
+     		if(std::chrono::duration_cast<std::chrono::milliseconds>(t1 - lastTimePose_).count() > 50){
         		emit localPositionChanged(); 
     		}
     
-    		mLastTimePose = t1;
+    		lastTimePose_ = t1;
 	}
 	
     });
@@ -229,7 +229,7 @@ void UAV_gui::run_localPose(){
 //---------------------------------------------------------------------------------------------------------------------
 void UAV_gui::stop_localPose(){
 
-    mPrintLocalPose = false;
+    printLocalPose_ = false;
     ui->Run_pose->setVisible(1);
     ui->Stop_pose->setVisible(0);
 
@@ -253,8 +253,8 @@ void UAV_gui::run_customPose()
     msg.x = x;
     msg.y = y;
     msg.z = z;
-    if(!mSendVelocity){
-        mPubCommand->publish(msg);
+    if(!sendVelocity_){
+        pubCommand_->publish(msg);
         }else{
         std::cout << "Cant send position while you are sending velocity" << std::endl;
     }
@@ -274,10 +274,10 @@ void UAV_gui::add_customPose()
     y = qY.toFloat();
     z = qZ.toFloat();
 
-    int id = mIDWP;
-    mIDWP++;
+    int id = idWP_;
+    idWP_++;
     std::vector<double> point = {x, y, z};
-    mWayPoints.push_back(std::make_pair(id, point));
+    waypoints_.push_back(std::make_pair(id, point));
 
     std::string swaypoint = "ID: " + std::to_string(id) + " , " + "X: " + std::to_string(x) + " , " +  "Y: " + std::to_string(y) + " , " + "Z: " + std::to_string(z);
     
@@ -298,24 +298,24 @@ void UAV_gui::run_velocity(){
     y = qY.toFloat();
     z = qZ.toFloat();
 
-    mSendVelUAV.x = x; 
-    mSendVelUAV.y = y;
-    mSendVelUAV.z = z;
+    sendVelUAV_.x = x; 
+    sendVelUAV_.y = y;
+    sendVelUAV_.z = z;
 
-    mSendVelocity = true;
-    mVelocityThread = std::thread([&]{
-        while(mSendVelocity){
+    sendVelocity_ = true;
+    velocityThread_ = std::thread([&]{
+        while(sendVelocity_){
             command msg;
             msg.type = "velocity";
-            msg.x = mSendVelUAV.x;
-            msg.y = mSendVelUAV.y;
-            msg.z = mSendVelUAV.z;
+            msg.x = sendVelUAV_.x;
+            msg.y = sendVelUAV_.y;
+            msg.z = sendVelUAV_.z;
             auto t1 = std::chrono::high_resolution_clock::now();
-     		if(std::chrono::duration_cast<std::chrono::milliseconds>(t1 - mLastTimeSendVel).count() > 50){
-        		mPubCommand->publish(msg);
+     		if(std::chrono::duration_cast<std::chrono::milliseconds>(t1 - lastTimeSendVel_).count() > 50){
+        		pubCommand_->publish(msg);
     		}
     
-    		mLastTimeSendVel = t1;
+    		lastTimeSendVel_ = t1;
         }
     });
     
@@ -327,7 +327,7 @@ void UAV_gui::run_velocity(){
 //---------------------------------------------------------------------------------------------------------------------
 void UAV_gui::stop_velocity(){
 
-    mSendVelocity = false;
+    sendVelocity_ = false;
     ui->Run_vel->setVisible(0);
     ui->Stop_vel->setVisible(1);
 
@@ -336,14 +336,14 @@ void UAV_gui::stop_velocity(){
 //---------------------------------------------------------------------------------------------------------------------
 void UAV_gui::run_waypoints(){
 
-    for(unsigned i = 0; i < mWayPoints.size(); i++){
+    for(unsigned i = 0; i < waypoints_.size(); i++){
         command msg;
         msg.type = "position";
-        msg.x = mWayPoints[i].second[0];
-        msg.y = mWayPoints[i].second[1];
-        msg.z = mWayPoints[i].second[2];
-        if(!mSendVelocity){
-            mPubCommand->publish(msg);
+        msg.x = waypoints_[i].second[0];
+        msg.y = waypoints_[i].second[1];
+        msg.z = waypoints_[i].second[2];
+        if(!sendVelocity_){
+            pubCommand_->publish(msg);
             }else{
             std::cout << "Cant send position while you are sending velocity" << std::endl;
         }
@@ -360,7 +360,7 @@ void UAV_gui::delete_waypoints(){
     foreach(QListWidgetItem * item, items){
 
         int index = ui->listWidget_WayPoints->row(item);
-        mWayPoints.erase(mWayPoints.begin() + index);
+        waypoints_.erase(waypoints_.begin() + index);
         delete ui->listWidget_WayPoints->takeItem(ui->listWidget_WayPoints->row(item));
     }
 
@@ -371,8 +371,8 @@ void UAV_gui::emergency(){
 
     command msg;
     msg.type = "emergency";
-    mSendVelocity = false;
-    mPubCommand->publish(msg);
+    sendVelocity_ = false;
+    pubCommand_->publish(msg);
 
 }
 
@@ -383,25 +383,25 @@ void UAV_gui::emergency(){
 //---------------------------------------------------------------------------------------------------------------------
 void UAV_gui::updateLocalPose(){
 
-    ui->lineEdit_j1->setText(QString::number(mPoseUAV.x));
-    ui->lineEdit_j2->setText(QString::number(mPoseUAV.y));
-    ui->lineEdit_j3->setText(QString::number(mPoseUAV.z));
+    ui->lineEdit_j1->setText(QString::number(poseUAV_.x));
+    ui->lineEdit_j2->setText(QString::number(poseUAV_.y));
+    ui->lineEdit_j3->setText(QString::number(poseUAV_.z));
 
 }
 
 //---------------------------------------------------------------------------------------------------------------------
 void UAV_gui::updateVel(){
 
-    ui->lineEdit_v1->setText(QString::number(mVelUAV.x));
-    ui->lineEdit_v2->setText(QString::number(mVelUAV.y));
-    ui->lineEdit_v3->setText(QString::number(mVelUAV.z));
+    ui->lineEdit_v1->setText(QString::number(velUAV_.x));
+    ui->lineEdit_v2->setText(QString::number(velUAV_.y));
+    ui->lineEdit_v3->setText(QString::number(velUAV_.z));
 
 }
 
 //---------------------------------------------------------------------------------------------------------------------
 void UAV_gui::updateState(){
 
-    ui->lineEdit_M->setText(QString::fromStdString(mStateUAV));
+    ui->lineEdit_M->setText(QString::fromStdString(stateUAV_));
 
 }
 

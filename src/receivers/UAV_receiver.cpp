@@ -39,58 +39,58 @@ bool UAV_receiver::init(int _argc, char**_argv) {
     strStream << rawFile.rdbuf(); //read the file
     std::string json = strStream.str(); //str holds the content of the file
 
-    if(mConfigFile.Parse(json.c_str()).HasParseError()){
+    if(configFile_.Parse(json.c_str()).HasParseError()){
         std::cout << "Error parsing json" << std::endl;
         return false;
     }
 
-    std::string ip = mConfigFile["ip_receiver"].GetString();
-    int portCommand = mConfigFile["portCommand"].GetInt();
-    int portState = mConfigFile["portState"].GetInt();
-    int portPose = mConfigFile["portPose"].GetInt();
-    int portVel = mConfigFile["portVel"].GetInt();
+    std::string ip = configFile_["ip_receiver"].GetString();
+    int portCommand = configFile_["portCommand"].GetInt();
+    int portState = configFile_["portState"].GetInt();
+    int portPose = configFile_["portPose"].GetInt();
+    int portVel = configFile_["portVel"].GetInt();
 
     // Init UAV controller
-    mUAL = new grvc::ual::UAL(_argc, _argv);
+    ual_ = new grvc::ual::UAL(_argc, _argv);
 
     // Initialize Fastcom publishers and subscribers
-    mSubsCommand = new fastcom::Subscriber<command>(ip, portCommand);
-    mPubState = new fastcom::Publisher<std::string>(portState);
-    mPubPose = new fastcom::Publisher<pose>(portPose);
-    mPubVel = new fastcom::Publisher<pose>(portVel);
+    subsCommand_ = new fastcom::Subscriber<command>(ip, portCommand);
+    pubState_ = new fastcom::Publisher<std::string>(portState);
+    pubPose_ = new fastcom::Publisher<pose>(portPose);
+    pubVel_ = new fastcom::Publisher<pose>(portVel);
 
     // Callback of received commands
-    mSubsCommand->attachCallback([&](command &_data){
+    subsCommand_->attachCallback([&](command &_data){
         if(_data.type == "takeoff"){
-            mState = eState::TAKEOFF;
-            mHeight = _data.height;
+            state_ = eState::TAKEOFF;
+            height_ = _data.height;
         }else if(_data.type == "land"){
-            mState = eState::LAND;
+            state_ = eState::LAND;
         }else if(_data.type == "position"){
-            mState = eState::MOVE;
-            mX = _data.x;
-            mY = _data.y;
-            mZ = _data.z;
+            state_ = eState::MOVE;
+            x_ = _data.x;
+            y_ = _data.y;
+            z_ = _data.z;
         }else if(_data.type == "velocity"){
-            mState = eState::MOVE_VEL;
-            mX = _data.x;
-            mY = _data.y;
-            mZ = _data.z;
+            state_ = eState::MOVE_VEL;
+            x_ = _data.x;
+            y_ = _data.y;
+            z_ = _data.z;
         }else if(_data.type == "wait"){
-            mState = eState::WAIT;
+            state_ = eState::WAIT;
         }else if(_data.type == "emergency"){
-            mState = eState::EXIT;
+            state_ = eState::EXIT;
         }else{
             std::cout << "Unrecognized state" << std::endl;
-            mState = eState::WAIT;
+            state_ = eState::WAIT;
         }
     });
 
     // Publisher State thread
-    mStateThread = std::thread([&](){
-        while(!mFin && ros::ok()){
+    stateThread_ = std::thread([&](){
+        while(!fin_ && ros::ok()){
             std::string msg;
-            switch(mState){
+            switch(state_){
                 case eState::WAIT:
                     msg = "WAIT";
                     break;
@@ -110,42 +110,42 @@ bool UAV_receiver::init(int _argc, char**_argv) {
                     msg = "EXIT";
                     break;
             }
-            mPubState->publish(msg);
+            pubState_->publish(msg);
             std::this_thread::sleep_for(std::chrono::milliseconds(50));
         }
     });
 
     // Publisher Pose thread
-    mPoseThread = std::thread([&](){
-        while(!mFin && ros::ok()){
+    poseThread_ = std::thread([&](){
+        while(!fin_ && ros::ok()){
             // Get pose
-            grvc::ual::Pose p = mUAL->pose();
+            grvc::ual::Pose p = ual_->pose();
 
             pose sendPose;
             sendPose.x = p.pose.position.x;
             sendPose.y = p.pose.position.y;
             sendPose.z = p.pose.position.z;
-            mPubPose->publish(sendPose);
+            pubPose_->publish(sendPose);
             std::this_thread::sleep_for(std::chrono::milliseconds(30));
         }
     });
 
     // Publisher Velocity thread
-    mVelThread = std::thread([&](){
-        while(!mFin && ros::ok()){
+    velThread_ = std::thread([&](){
+        while(!fin_ && ros::ok()){
             // Get velocity
-            grvc::ual::Velocity v = mUAL->velocity();
+            grvc::ual::Velocity v = ual_->velocity();
 
             pose sendVel;
             sendVel.x = v.twist.linear.x;
             sendVel.y = v.twist.linear.y;
             sendVel.z = v.twist.linear.z;
-            mPubVel->publish(sendVel);
+            pubVel_->publish(sendVel);
             std::this_thread::sleep_for(std::chrono::milliseconds(30));
         }
     });
 
-    mState = eState::WAIT;
+    state_ = eState::WAIT;
 
     return true;
 }
@@ -153,8 +153,8 @@ bool UAV_receiver::init(int _argc, char**_argv) {
 //---------------------------------------------------------------------------------------------------------------------
 bool UAV_receiver::run() {
 
-    while(!mFin && ros::ok()){
-        switch (mState) {
+    while(!fin_ && ros::ok()){
+        switch (state_) {
             case eState::WAIT:
             {   
                 std::this_thread::sleep_for(std::chrono::milliseconds(100)); 
@@ -162,49 +162,49 @@ bool UAV_receiver::run() {
             }
             case eState::TAKEOFF:
             {   
-                mUAL->takeOff(mHeight);
-                mState = eState::WAIT;
+                ual_->takeOff(height_);
+                state_ = eState::WAIT;
                 break;
             }
             case eState::LAND:
             {   
-                mUAL->land();
-                mState = eState::WAIT;
+                ual_->land();
+                state_ = eState::WAIT;
                 break;
             }
             case eState::MOVE:
             {   
                 grvc::ual::Waypoint waypoint;
                 waypoint.header.frame_id = "map";
-                waypoint.pose.position.x = mX;
-                waypoint.pose.position.y = mY;
-                waypoint.pose.position.z = mZ;
+                waypoint.pose.position.x = x_;
+                waypoint.pose.position.y = y_;
+                waypoint.pose.position.z = z_;
                 waypoint.pose.orientation.x = 0;
                 waypoint.pose.orientation.y = 0;
                 waypoint.pose.orientation.z = 0;
                 waypoint.pose.orientation.w = 1;
-                mUAL->goToWaypoint(waypoint);
-                mState = eState::WAIT;
+                ual_->goToWaypoint(waypoint);
+                state_ = eState::WAIT;
                 break;
             }
             case eState::MOVE_VEL:
             {   
                 grvc::ual::Velocity velocity;
                 velocity.header.frame_id = "map";
-                velocity.twist.linear.x = mX;
-                velocity.twist.linear.y = mY;
-                velocity.twist.linear.z = mZ;
-                mUAL->setVelocity(velocity);
-                //mState = eState::WAIT; // Al estar comentado seguimos manteniendo la ultima velocidad en caso de que dejemos de enviar
+                velocity.twist.linear.x = x_;
+                velocity.twist.linear.y = y_;
+                velocity.twist.linear.z = z_;
+                ual_->setVelocity(velocity);
+                //state_ = eState::WAIT; // Al estar comentado seguimos manteniendo la ultima velocidad en caso de que dejemos de enviar
                 break;
             }
             case eState::EXIT:
             {
                 std::cout << "State EXIT" << std::endl;
-                mFin = true;
-                mStateThread.join();
-                mPoseThread.join();
-                mVelThread.join();
+                fin_ = true;
+                stateThread_.join();
+                poseThread_.join();
+                velThread_.join();
                 std::cout << "\nEXIT..." << std::endl;
                 break;
             }

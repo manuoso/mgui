@@ -45,86 +45,118 @@ class UAV_gui : public QMainWindow {
     Q_OBJECT
 
     public:
+        /// Constructor
         explicit UAV_gui(QWidget *parent = 0);
+
+        /// Destructor
         ~UAV_gui();
 
+        /// Method that configure PCL GUI
+        /// \param _argc: from main
+        /// \param _argv: from main
+        /// \return true if params are good or without errors, false if something failed
         bool configureGUI(int _argc, char **_argv);
 
-	struct command{
-		std::string type;
-		float height;
-		float x;
-		float y;
-		float z;
-	    };
+        /// Struct for send commands to the UAV
+        struct command{
+            std::string type;
+            float height;
+            float x;
+            float y;
+            float z;
+            };
 
-	struct pose{
-		float x;
-		float y;
-		float z;
-	    };
+        /// Struct for received pose and send the velocity of the UAV
+        struct pose{
+            float x;
+            float y;
+            float z;
+            };
 
-signals:
-    /// Signal that warns that there is a change in the pose of the uav
-    void localPositionChanged();
+    signals:
+        /// Signal that warns that there is a change in the pose of the uav
+        void localPositionChanged();
 
-    void velChanged();
-    
-    void stateChanged();
-
-    private slots:
-
-        void takeOff();
-        void land();
-
-        void run_getVel();
-        void stop_getVel();
-
-        void run_localPose();
-        void stop_localPose();
-
-        void run_customPose();
-        void add_customPose();
-
-        void run_velocity();
-        void stop_velocity();
-
-        void run_waypoints();
-        void delete_waypoints();
-
-        void emergency();
-
-    private:
-        void updateLocalPose();
-
-        void updateVel();
-
-        void updateState();
-
-    private:
-        Ui::UAV_gui *ui;
-
-        Marble::MarbleWidget *mMapWidget;
-
-        rapidjson::Document mConfigFile;
-
-        fastcom::Publisher<command> *mPubCommand;
-        fastcom::Subscriber<std::string> *mSubsState;
-        fastcom::Subscriber<pose> *mSubsPose;
-        fastcom::Subscriber<pose> *mSubsVel;
-
-        std::thread mVelocityThread, mLocalPoseThread, mGetVelThread;
+        /// Signal that warns that there is a change in the vel of the uav
+        void velChanged();
         
-        std::chrono::time_point<std::chrono::high_resolution_clock> mLastTimePose, mLastTimeVel, mLastTimeSendVel;	
-        std::vector<std::pair<int, std::vector<double>>> mWayPoints;
-        
-        int mIDWP = 0;
-        std::string mIdUAV;
-        std::string mStateUAV;
-        pose mPoseUAV, mVelUAV, mSendVelUAV;
-        bool mPrintLocalPose = false;
-        bool mPrintVel = false;
-        bool mSendVelocity = false;
+        /// Signal that warns that there is a change in the state of the uav
+        void stateChanged();
+
+        private slots:
+            /// Slot that send takeoff to the UAV
+            void takeOff();
+
+            /// Slot that send land to the UAV
+            void land();   
+
+            /// Slot that run get velocity of the UAV
+            void run_getVel();
+
+            /// Slot that stop the thread of take velocity of the UAV
+            void stop_getVel();
+            
+            /// Slot that run get local position of the UAV
+            void run_localPose();
+
+            /// Slot that stop the thread of take local position of the UAV
+            void stop_localPose();
+
+            /// Slot that send a custom pose to go the UAV
+            void run_customPose();
+
+            /// Slot that add a waypoint of a value of a custom pose
+            void add_customPose();
+
+            /// Slot that send a desired velocity to go the UAV
+            void run_velocity();
+
+            /// Slot that stop sending a desired velocity to go the UAV
+            void stop_velocity();
+
+            /// Slot that send a list of waypoints to go the UAV
+            void run_waypoints();
+
+            /// Slot that delete a desired waypoint of a list of waypoints
+            void delete_waypoints();
+
+            /// Slot that send a message of emergency to finish all in the UAV
+            void emergency();
+
+        private:
+            /// Thread that update local position of the UAV
+            void updateLocalPose();
+
+            /// Thread that update the velocity of the UAV
+            void updateVel();
+
+            /// Thread that update the state of the UAV
+            void updateState();
+
+        private:
+            Ui::UAV_gui *ui;
+
+            Marble::MarbleWidget *mapWidget_;
+
+            rapidjson::Document configFile_;
+
+            fastcom::Publisher<command> *pubCommand_;
+            fastcom::Subscriber<std::string> *subsState_;
+            fastcom::Subscriber<pose> *subsPose_;
+            fastcom::Subscriber<pose> *subsVel_;
+
+            std::thread velocityThread_, localPoseThread_, getVelThread_;
+            
+            std::chrono::time_point<std::chrono::high_resolution_clock> lastTimePose_, lastTimeVel_, lastTimeSendVel_;	
+            std::vector<std::pair<int, std::vector<double>>> waypoints_;
+            
+            int idWP_ = 0;
+            std::string idUAV_;
+            std::string stateUAV_;
+            pose poseUAV_, velUAV_, sendVelUAV_;
+            bool printLocalPose_ = false;
+            bool printVel_ = false;
+            bool sendVelocity_ = false;
 };
 
 #endif // GUIS_UAV_GUI_H

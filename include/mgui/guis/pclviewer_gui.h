@@ -78,6 +78,7 @@ public:
     /// \return true if params are good or without errors, false if something failed
     bool configureGUI(int _argc, char **_argv);
 
+    /// Struct for received pose of the UAV
     struct pose{
 		float x;
 		float y;
@@ -135,38 +136,38 @@ private:
 private:
     Ui::PCLViewer_gui *ui;
 
-    boost::shared_ptr<pcl::visualization::PCLVisualizer> mViewer;
-    PointCloudT1::Ptr mCloudT1, mCloudT1Filtered;
-    PointCloudT2::Ptr mCloudT2, mCloudT2Filtered;
-    pcl::PolygonMesh mUntransformedUav;
+    boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer_;
+    PointCloudT1::Ptr cloudT1_, cloudT1Filtered_;
+    PointCloudT2::Ptr cloudT2_, cloudT2Filtered_;
+    pcl::PolygonMesh untransformedUav_;
 
-    std::chrono::time_point<std::chrono::high_resolution_clock> mLastTimePose;
-    fastcom::Subscriber<pose> *mSubsPose;
+    std::chrono::time_point<std::chrono::high_resolution_clock> lastTimePose_;
+    fastcom::Subscriber<pose> *subsPose_;
 
-    bool mConvertAndSave = false;
-    bool mUsePCD = false;
-    bool mUsePLY = false;
-    bool mUseTXT = false;
-    std::string mDirPCD = "";
-    std::string mDirTXT = "";
-    std::string mDirPLY = "";
-    std::string mTypePoint = "";
-    std::string mTypeCallbackPose = "";
-    std::string mNameCallbackPose = "";
-    std::string mIPCallbackPose = "";
-    int mPortCallbackPose = 0;
-    std::string mTypeModelPose = "";
-    std::string mPathModelPose = "";
+    bool convertAndSave_ = false;
+    bool usePCD_ = false;
+    bool usePLY_ = false;
+    bool useTXT_ = false;
+    std::string dirPCD_ = "";
+    std::string dirTXT_ = "";
+    std::string dirPLY_ = "";
+    std::string typePoint_ = "";
+    std::string typeCallbackPose_ = "";
+    std::string nameCallbackPose_ = "";
+    std::string ipCallbackPose_ = "";
+    int portCallbackPose_ = 0;
+    std::string typeModelPose_ = "";
+    std::string pathModelPose_ = "";
 
-    rapidjson::Document mConfigFile;
+    rapidjson::Document configFile_;
 
-    int mContSpheres = 1;
-    bool mEndSub = false;
+    int contSpheres_ = 1;
+    bool endSub_ = false;
 
-    std::vector<std::pair<int, std::vector<double>>> mWayPoints;
-    float mPoseX = 0.0, mPoseY = 0.0, mPoseZ = 0.0, mPoseOX = 0.0, mPoseOY = 0.0, mPoseOZ = 0.0, mPoseOW = 1.0;
+    std::vector<std::pair<int, std::vector<double>>> waypoints_;
+    float poseX_ = 0.0, poseY_ = 0.0, poseZ_ = 0.0, poseOX_ = 0.0, poseOY_ = 0.0, poseOZ_ = 0.0, poseOw_ = 1.0;
 
-    std::mutex mObjectLock;
+    std::mutex objectLock_;
 
 };
 

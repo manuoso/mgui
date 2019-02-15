@@ -66,66 +66,68 @@ bool PCLViewer_gui::configureGUI(int _argc, char **_argv)
     strStream << rawFile.rdbuf(); 
     std::string json = strStream.str(); 
 
-    if(mConfigFile.Parse(json.c_str()).HasParseError()){
+    if(configFile_.Parse(json.c_str()).HasParseError()){
         std::cout << "Error parsing json" << std::endl;
         return false;
     }
 
-    mConvertAndSave = mConfigFile["save_pcd_ply"].GetBool();
+    convertAndSave_ = configFile_["save_pcd_ply"].GetBool();
 
-    mUsePCD = mConfigFile["use_pcd"].GetBool();
-    mDirPCD = mConfigFile["dir_pcd"].GetString();
+    usePCD_ = configFile_["use_pcd"].GetBool();
+    dirPCD_ = configFile_["dir_pcd"].GetString();
 
-    mUsePLY = mConfigFile["use_ply"].GetBool();
-    mDirPLY = mConfigFile["dir_ply"].GetString();
+    usePLY_ = configFile_["use_ply"].GetBool();
+    dirPLY_ = configFile_["dir_ply"].GetString();
 
-    mUseTXT = mConfigFile["use_txt"].GetBool();
-    mDirTXT = mConfigFile["dir_txt"].GetString();
+    useTXT_ = configFile_["use_txt"].GetBool();
+    dirTXT_ = configFile_["dir_txt"].GetString();
     
-    mTypePoint = mConfigFile["type_point"].GetString();
+    typePoint_ = configFile_["type_point"].GetString();
 
-    mTypeCallbackPose = mConfigFile["type_callback"].GetString();
-    mNameCallbackPose = mConfigFile["callback_name"].GetString();
-    mIPCallbackPose = mConfigFile["callback_ip"].GetString();
-    mPortCallbackPose = mConfigFile["callback_port"].GetInt();
+    typeCallbackPose_ = configFile_["type_callback"].GetString();
+    nameCallbackPose_ = configFile_["callback_name"].GetString();
+    ipCallbackPose_ = configFile_["callback_ip"].GetString();
+    portCallbackPose_ = configFile_["callback_port"].GetInt();
 
-    mTypeModelPose = mConfigFile["type_model_pose"].GetString();
-    mPathModelPose = mConfigFile["model_pose"].GetString();
+    typeModelPose_ = configFile_["type_model_pose"].GetString();
+    pathModelPose_ = configFile_["model_pose"].GetString();
 
-    if(mUsePCD && !mUsePLY && !mUseTXT){
-        extractPointCloud(mDirPCD);
-    }else if(!mUsePCD && mUsePLY && !mUseTXT){
-        extractPointCloud(mDirPLY);
-    }else if(!mUsePCD && !mUsePLY && mUseTXT){
-        extractPointCloud(mDirTXT);
+    if(usePCD_ && !usePLY_ && !useTXT_){
+        extractPointCloud(dirPCD_);
+    }else if(!usePCD_ && usePLY_ && !useTXT_){
+        extractPointCloud(dirPLY_);
+    }else if(!usePCD_ && !usePLY_ && useTXT_){
+        extractPointCloud(dirTXT_);
     }else{
         std::cout << "ERROR! You use more than one dir" << std::endl;
         return false;
     }
 
-    if(mTypeCallbackPose == "fastcom"){
-        mSubsPose = new fastcom::Subscriber<pose>(mIPCallbackPose, mPortCallbackPose);
-    }else if(mTypeCallbackPose == "ros"){
+    if(typeCallbackPose_ == "fastcom"){
+        subsPose_ = new fastcom::Subscriber<pose>(ipCallbackPose_, portCallbackPose_);
+    }else if(typeCallbackPose_ == "ros"){
 
     }else{
         std::cout << "ERROR! You use a unrecognized type of callback" << std::endl;
         return false;
     }
 
-    mLastTimePose = std::chrono::high_resolution_clock::now();
+    lastTimePose_ = std::chrono::high_resolution_clock::now();
 
     // Callback of received pose
-    mSubsPose->attachCallback([&](pose &_data){
-        mPoseX = _data.x;
-        mPoseY = _data.y;
-        mPoseZ = _data.z;
+    subsPose_->attachCallback([&](pose &_data){
+        objectLock_.lock();
+        poseX_ = _data.x;
+        poseY_ = _data.y;
+        poseZ_ = _data.z;
+        objectLock_.unlock();
 
         auto t1 = std::chrono::high_resolution_clock::now();
-        if(std::chrono::duration_cast<std::chrono::milliseconds>(t1 - mLastTimePose).count() > 50){
+        if(std::chrono::duration_cast<std::chrono::milliseconds>(t1 - lastTimePose_).count() > 50){
             emit poseUAVchanged(); 
         }
 
-        mLastTimePose = t1;
+        lastTimePose_ = t1;
 
     });
     
@@ -153,10 +155,10 @@ void PCLViewer_gui::addWaypoint(){
     zq = 0.0;
     wq = 1.0;
 
-    int id = mContSpheres - 1;
+    int id = contSpheres_ - 1;
 
     std::vector<double> point = {x, y, z, xq, yq, zq, wq};
-    mWayPoints.push_back(std::make_pair(id, point));
+    waypoints_.push_back(std::make_pair(id, point));
 
     std::string swaypoint = "ID: " + std::to_string(id) + " , " + "X: " + std::to_string(x) + " , " +  "Y: " + std::to_string(y) + " , " + "Z: " + std::to_string(z) + " , " + "QX: " + std::to_string(xq) + " , " + "QY: " + std::to_string(yq) + " , " + "QZ: " + std::to_string(zq) + " , " + "QW: " + std::to_string(wq);
     
@@ -168,21 +170,21 @@ void PCLViewer_gui::run_generateTray(){
 
     // motion_planner
 
-    if(mTypePoint == "PointXYZ"){
+    if(typePoint_ == "PointXYZ"){
         std::cout << "Not implemented YET" << std::endl;
 
-    }else if(mTypePoint == "PointXYZRGB"){
+    }else if(typePoint_ == "PointXYZRGB"){
         
         // Filter cloud
         // pcl::VoxelGrid<pcl::PointXYZRGB> sor;
-        // sor.setInputCloud(mCloudT2);
+        // sor.setInputCloud(cloudT2_);
         // sor.setLeafSize(0.2f, 0.2f, 0.2f);
-        // sor.filter(*mCloudT2Filtered);
+        // sor.filter(*cloudT2Filtered_);
 
         // Get min and max of cloud
         pcl::PointXYZRGB minPt, maxPt;
-        //pcl::getMinMax3D (*mCloudT2Filtered, minPt, maxPt);
-        pcl::getMinMax3D (*mCloudT2, minPt, maxPt);
+        //pcl::getMinMax3D (*cloudT2Filtered_, minPt, maxPt);
+        pcl::getMinMax3D (*cloudT2_, minPt, maxPt);
 
         // Config planner
         mp::RRTStar planner;
@@ -196,8 +198,8 @@ void PCLViewer_gui::run_generateTray(){
 
         // Add constraint
         pcl::octree::OctreePointCloudSearch<pcl::PointXYZRGB> octree(0.1);
-        //octree.setInputCloud(mCloudT2Filtered);
-        octree.setInputCloud(mCloudT2);
+        //octree.setInputCloud(cloudT2Filtered_);
+        octree.setInputCloud(cloudT2_);
         octree.addPointsFromInputCloud();
 
         float safeDist = 1.0;
@@ -224,10 +226,10 @@ void PCLViewer_gui::run_generateTray(){
         planner.addConstraint(c2);
 
         // Draw sphere
-        std::string sSphere = "sphere" + std::to_string(mContSpheres);
-        mViewer->addSphere(pcl::PointXYZ(sphereCentre[0], sphereCentre[1], sphereCentre[2]), radSphere, sSphere);
+        std::string sSphere = "sphere" + std::to_string(contSpheres_);
+        viewer_->addSphere(pcl::PointXYZ(sphereCentre[0], sphereCentre[1], sphereCentre[2]), radSphere, sSphere);
         ui->qvtkWidget->update();
-        mContSpheres++;
+        contSpheres_++;
 
         // Compute traj
         auto traj = planner.compute();
@@ -255,7 +257,7 @@ void PCLViewer_gui::run_generateTray(){
         }
 
         treeBase->SetPoints(covisibilityNodes);
-        mViewer->addModelFromPolyData(treeBase, "treeRRT");
+        viewer_->addModelFromPolyData(treeBase, "treeRRT");
         ui->qvtkWidget->update();
 
         // Create new graph
@@ -286,7 +288,7 @@ void PCLViewer_gui::run_generateTray(){
 
         covisibilityGraph->SetPoints(covisibilityNodesTraj);
         covisibilityGraph->GetPointData()->SetScalars(covisibilityNodeColors);
-        mViewer->addModelFromPolyData(covisibilityGraph, "covisibility_graph_"+std::to_string(mContSpheres));
+        viewer_->addModelFromPolyData(covisibilityGraph, "covisibility_graph_"+std::to_string(contSpheres_));
         ui->qvtkWidget->update();
 
     }
@@ -303,13 +305,13 @@ void PCLViewer_gui::run_sendMision(){
 //---------------------------------------------------------------------------------------------------------------------
 void PCLViewer_gui::deleteSphere(){
     
-    //mWayPoints.clear();
+    //waypoints_.clear();
 
-    // for(int i = 0; i < mContSpheres; i++){
+    // for(int i = 0; i < contSpheres_; i++){
     //     std::string removeSphere = "sphere" + std::to_string(i);
-    //     mViewer->removeShape(removeSphere);
+    //     viewer_->removeShape(removeSphere);
     // }
-    // mContSpheres = 0;
+    // contSpheres_ = 0;
     ui->qvtkWidget->update();
 
 }
@@ -322,75 +324,75 @@ void PCLViewer_gui::deleteSphere(){
 bool PCLViewer_gui::extractPointCloud(std::string _dir)
 {   
     // Set up the QVTK window
-    mViewer.reset(new pcl::visualization::PCLVisualizer("viewer", false));
-    ui->qvtkWidget->SetRenderWindow(mViewer->getRenderWindow());
-    mViewer->setupInteractor(ui->qvtkWidget->GetInteractor(), ui->qvtkWidget->GetRenderWindow());
+    viewer_.reset(new pcl::visualization::PCLVisualizer("viewer", false));
+    ui->qvtkWidget->SetRenderWindow(viewer_->getRenderWindow());
+    viewer_->setupInteractor(ui->qvtkWidget->GetInteractor(), ui->qvtkWidget->GetRenderWindow());
     ui->qvtkWidget->update();
 
-    if(_dir == mDirPCD){
-        if(mTypePoint == "PointXYZ"){
-            mCloudT1.reset (new PointCloudT1);
-            if (pcl::io::loadPCDFile<PointT1>(_dir, *mCloudT1) == -1){
+    if(_dir == dirPCD_){
+        if(typePoint_ == "PointXYZ"){
+            cloudT1_.reset (new PointCloudT1);
+            if (pcl::io::loadPCDFile<PointT1>(_dir, *cloudT1_) == -1){
                 PCL_ERROR ("Couldn't read file PCD \n");
                 return false;
             }
-            //std::cout << "Loaded PointCloud with Number of Points: " << mCloudT1->width*mCloudT1->height << std::endl;
-            mViewer->addPointCloud(mCloudT1, "cloud");
-        }else if(mTypePoint == "PointXYZRGB"){
-            mCloudT2.reset (new PointCloudT2);
-            if (pcl::io::loadPCDFile<PointT2>(_dir, *mCloudT2) == -1){
+            //std::cout << "Loaded PointCloud with Number of Points: " << cloudT1_->width*cloudT1_->height << std::endl;
+            viewer_->addPointCloud(cloudT1_, "cloud");
+        }else if(typePoint_ == "PointXYZRGB"){
+            cloudT2_.reset (new PointCloudT2);
+            if (pcl::io::loadPCDFile<PointT2>(_dir, *cloudT2_) == -1){
                 PCL_ERROR ("Couldn't read file PCD \n");
                 return false;
             }
-            //std::cout << "Loaded PointCloud with Number of Points: " << mCloudT2->width*mCloudT2->height << std::endl;
-            mViewer->addPointCloud(mCloudT2, "cloud");
+            //std::cout << "Loaded PointCloud with Number of Points: " << cloudT2_->width*cloudT2_->height << std::endl;
+            viewer_->addPointCloud(cloudT2_, "cloud");
         }
-    }else if(_dir == mDirTXT){
-        mCloudT1.reset (new PointCloudT1);
-        mCloudT2.reset (new PointCloudT2);
-        if(convertToPointCloud(mDirTXT)){
-            if(mTypePoint == "PointXYZ"){
-                //std::cout << "Loaded PointCloud with Number of Points: " << mCloudT1->width*mCloudT1->height << std::endl;
-                mViewer->addPointCloud(mCloudT1, "cloud");
-            }else if(mTypePoint == "PointXYZRGB"){
-                //std::cout << "Loaded PointCloud with Number of Points: " << mCloudT2->width*mCloudT2->height << std::endl;
-                mViewer->addPointCloud(mCloudT2, "cloud");
+    }else if(_dir == dirTXT_){
+        cloudT1_.reset (new PointCloudT1);
+        cloudT2_.reset (new PointCloudT2);
+        if(convertToPointCloud(dirTXT_)){
+            if(typePoint_ == "PointXYZ"){
+                //std::cout << "Loaded PointCloud with Number of Points: " << cloudT1_->width*cloudT1_->height << std::endl;
+                viewer_->addPointCloud(cloudT1_, "cloud");
+            }else if(typePoint_ == "PointXYZRGB"){
+                //std::cout << "Loaded PointCloud with Number of Points: " << cloudT2_->width*cloudT2_->height << std::endl;
+                viewer_->addPointCloud(cloudT2_, "cloud");
             }
         }
-    }else if(_dir == mDirPLY){
-        if(mTypePoint == "PointXYZ"){
-            mCloudT1.reset (new PointCloudT1);
-            if (pcl::io::loadPLYFile<PointT1>(_dir, *mCloudT1) == -1){
+    }else if(_dir == dirPLY_){
+        if(typePoint_ == "PointXYZ"){
+            cloudT1_.reset (new PointCloudT1);
+            if (pcl::io::loadPLYFile<PointT1>(_dir, *cloudT1_) == -1){
                 PCL_ERROR ("Couldn't read file PLY \n");
                 return false;
             }
-            //std::cout << "Loaded PointCloud with Number of Points: " << mCloudT1->width*mCloudT1->height << std::endl;
-            mViewer->addPointCloud(mCloudT1, "cloud");
-        }else if(mTypePoint == "PointXYZRGB"){
-            mCloudT2.reset (new PointCloudT2);
-            if (pcl::io::loadPLYFile<PointT2>(_dir, *mCloudT2) == -1){
+            //std::cout << "Loaded PointCloud with Number of Points: " << cloudT1_->width*cloudT1_->height << std::endl;
+            viewer_->addPointCloud(cloudT1_, "cloud");
+        }else if(typePoint_ == "PointXYZRGB"){
+            cloudT2_.reset (new PointCloudT2);
+            if (pcl::io::loadPLYFile<PointT2>(_dir, *cloudT2_) == -1){
                 PCL_ERROR ("Couldn't read file PLY \n");
                 return false;
             }
-            //std::cout << "Loaded PointCloud with Number of Points: " << mCloudT2->width*mCloudT2->height << std::endl;
-            mViewer->addPointCloud(mCloudT2, "cloud");
+            //std::cout << "Loaded PointCloud with Number of Points: " << cloudT2_->width*cloudT2_->height << std::endl;
+            viewer_->addPointCloud(cloudT2_, "cloud");
         }
     }
     
-    mViewer->resetCamera();
-    mViewer->registerPointPickingCallback(&PCLViewer_gui::pointPickingOccurred, *this);
+    viewer_->resetCamera();
+    viewer_->registerPointPickingCallback(&PCLViewer_gui::pointPickingOccurred, *this);
 
-    if(mNameCallbackPose != ""){
-        if(mTypeModelPose == "OBJ"){
-            pcl::io::loadPolygonFileOBJ(mPathModelPose, mUntransformedUav);
-        }else if(mTypeModelPose == "STL" ){
-            pcl::io::loadPolygonFileSTL(mPathModelPose, mUntransformedUav);
+    if(nameCallbackPose_ != ""){
+        if(typeModelPose_ == "OBJ"){
+            pcl::io::loadPolygonFileOBJ(pathModelPose_, untransformedUav_);
+        }else if(typeModelPose_ == "STL" ){
+            pcl::io::loadPolygonFileSTL(pathModelPose_, untransformedUav_);
         }else{
             std::cout << "Type of model pose unrecognised!" << std::endl;
             return false;
         }
         
-        mViewer->addPolygonMesh(mUntransformedUav, "uav_pose");
+        viewer_->addPolygonMesh(untransformedUav_, "uav_pose");
         ui->qvtkWidget->update();
     
 
@@ -432,10 +434,10 @@ bool PCLViewer_gui::convertToPointCloud(std::string _dir)
                 pclPointRGB.g = pG;
                 pclPointRGB.b = pB;
                     
-                if(mTypePoint == "PointXYZ"){
-                    mCloudT1->push_back(pclPoint);
-                }else if(mTypePoint == "PointXYZRGB"){
-                    mCloudT2->push_back(pclPointRGB);
+                if(typePoint_ == "PointXYZ"){
+                    cloudT1_->push_back(pclPoint);
+                }else if(typePoint_ == "PointXYZRGB"){
+                    cloudT2_->push_back(pclPointRGB);
                 }
             }	
         }
@@ -445,13 +447,13 @@ bool PCLViewer_gui::convertToPointCloud(std::string _dir)
         return false;
     }
 
-    if(mConvertAndSave){
-        if(mTypePoint == "PointXYZ"){
-            pcl::io::savePCDFileASCII("poindCloud.pcd", *mCloudT1);
-            pcl::io::savePLYFileASCII("poindCloud.ply", *mCloudT1);
-        }else if(mTypePoint == "PointXYZRGB"){
-            pcl::io::savePCDFileASCII("poindCloudRGB.pcd", *mCloudT2);
-            pcl::io::savePLYFileASCII("poindCloudRGB.ply", *mCloudT2);
+    if(convertAndSave_){
+        if(typePoint_ == "PointXYZ"){
+            pcl::io::savePCDFileASCII("poindCloud.pcd", *cloudT1_);
+            pcl::io::savePLYFileASCII("poindCloud.ply", *cloudT1_);
+        }else if(typePoint_ == "PointXYZRGB"){
+            pcl::io::savePCDFileASCII("poindCloudRGB.pcd", *cloudT2_);
+            pcl::io::savePLYFileASCII("poindCloudRGB.ply", *cloudT2_);
         }
     }
     
@@ -475,16 +477,16 @@ void PCLViewer_gui::pointPickingOccurred(const pcl::visualization::PointPickingE
     double radSphere;
     radSphere = qRadSphere.toDouble(); 
 
-    std::string sSphere = "sphere" + std::to_string(mContSpheres);
+    std::string sSphere = "sphere" + std::to_string(contSpheres_);
     //std::cout << "sSphere: " << sSphere << std::endl;
-    if(mTypePoint == "PointXYZ"){
-        mViewer->addSphere(mCloudT1->points[idx], radSphere, 1, 0, 0, sSphere);
+    if(typePoint_ == "PointXYZ"){
+        viewer_->addSphere(cloudT1_->points[idx], radSphere, 1, 0, 0, sSphere);
         ui->qvtkWidget->update();
-    }else if(mTypePoint == "PointXYZRGB"){
-        mViewer->addSphere(mCloudT2->points[idx], radSphere, 1, 0, 0, sSphere);
+    }else if(typePoint_ == "PointXYZRGB"){
+        viewer_->addSphere(cloudT2_->points[idx], radSphere, 1, 0, 0, sSphere);
         ui->qvtkWidget->update();
     }
-    mContSpheres++;
+    contSpheres_++;
 
     ui->lineEdit_MX->setText(QString::number(x));
     ui->lineEdit_MY->setText(QString::number(y));
@@ -495,24 +497,24 @@ void PCLViewer_gui::pointPickingOccurred(const pcl::visualization::PointPickingE
 //---------------------------------------------------------------------------------------------------------------------
 void PCLViewer_gui::updateObjectUAV(){
     
-    mObjectLock.lock();
+    objectLock_.lock();
     Eigen::Quaternionf q;
-    q.x() = mPoseOX;
-    q.y() = mPoseOY;
-    q.z() = mPoseOZ;
-    q.w() = mPoseOW;    
+    q.x() = poseOX_;
+    q.y() = poseOY_;
+    q.z() = poseOZ_;
+    q.w() = poseOw_;    
     Eigen::Matrix3f R = q.normalized().toRotationMatrix();
 
     Eigen::Matrix4f pose = Eigen::Matrix4f::Identity();
     pose.block<3,3>(0,0) = R;
-    pose(0,3) = mPoseX;
-    pose(1,3) = mPoseY;
-    pose(2,3) = mPoseZ;
-    mObjectLock.unlock();
+    pose(0,3) = poseX_;
+    pose(1,3) = poseY_;
+    pose(2,3) = poseZ_;
+    objectLock_.unlock();
 
     Eigen::Affine3f transform(pose);
 
-    pcl::PolygonMesh meshUav = mUntransformedUav;
+    pcl::PolygonMesh meshUav = untransformedUav_;
 
     PointCloudT1 pointCloud;
     pcl::fromPCLPointCloud2(meshUav.cloud, pointCloud);
@@ -521,14 +523,14 @@ void PCLViewer_gui::updateObjectUAV(){
         
     pcl::toPCLPointCloud2(pointCloud, meshUav.cloud);
 
-    // if(mTypePoint == "PointXYZ"){
+    // if(typePoint_ == "PointXYZ"){
     //     PointCloudT1 pointCloud;
     //     pcl::fromPCLPointCloud2(meshUav.cloud, pointCloud);
     
     //     pcl::transformPointCloud(pointCloud, pointCloud, transform);
         
     //     pcl::toPCLPointCloud2(pointCloud, meshUav.cloud);
-    // }else if(mTypePoint == "PointXYZRGB"){
+    // }else if(typePoint_ == "PointXYZRGB"){
     //     PointCloudT2 pointCloud;
     //     pcl::fromPCLPointCloud2(meshUav.cloud, pointCloud);
     
@@ -537,7 +539,7 @@ void PCLViewer_gui::updateObjectUAV(){
     //     pcl::toPCLPointCloud2(pointCloud, meshUav.cloud);
     // }
     
-    mViewer->updatePolygonMesh(meshUav, "uav_pose");
+    viewer_->updatePolygonMesh(meshUav, "uav_pose");
     ui->qvtkWidget->update();
 
 }
