@@ -101,7 +101,7 @@ if(${USE_GUI})
 	set(QT5_LIBRARIES Qt5::Widgets Qt5::PrintSupport Qt5::Core)
 
 	set(CMAKE_INCLUDE_CURRENT_DIR ON)
-	# set(CMAKE_AUTOMOC ON)
+	set(CMAKE_AUTOMOC ON)
 	set(CMAKE_AUTOUIC ON)
 	# set(CMAKE_AUTORCC ON)
 
@@ -161,18 +161,16 @@ target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_11)
 
 target_include_directories(${PROJECT_NAME} PUBLIC "/usr/include/eigen3")
 
-if(${USE_GUI})
-	target_link_libraries(${PROJECT_NAME} LINK_PUBLIC ${QT5_LIBRARIES})
-endif()
-
 target_include_directories(${PROJECT_NAME} PUBLIC ${RAPIDJSON_INCLUDE_DIRS})
 target_link_libraries(${PROJECT_NAME} LINK_PUBLIC ${RAPIDJSON_LIBRARIES})
 
 target_link_libraries(${PROJECT_NAME} PRIVATE fastcom::fastcom)
 
 if(${USE_GUI})
+	target_link_libraries(${PROJECT_NAME} LINK_PUBLIC ${QT5_LIBRARIES})
 	target_include_directories(${PROJECT_NAME} PUBLIC ${PCL_INCLUDE_DIRS})
 	target_link_libraries(${PROJECT_NAME} LINK_PUBLIC ${PCL_LIBRARIES})
+	target_link_libraries(${PROJECT_NAME} LINK_PUBLIC Marble)
 endif()
 
 if(${catkin_FOUND})

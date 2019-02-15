@@ -19,7 +19,7 @@
 //  CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //---------------------------------------------------------------------------------------------------------------------
 
-#include <mgui/guis/UAV_receiver.h>
+#include <mgui/receivers/UAV_receiver.h>
 #include <ros/ros.h>
 
 int main(int _argc, char** _argv){
@@ -36,7 +36,7 @@ int main(int _argc, char** _argv){
 
     bool check = false;
     UAV_receiver receiver;
-    check = receiver.init(_argc,_argv):
+    check = receiver.init(_argc,_argv);
 
     while(check && ros::ok()){
         check = receiver.run();
