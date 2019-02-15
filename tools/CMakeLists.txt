@@ -19,20 +19,7 @@
 ##  CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ##---------------------------------------------------------------------------------------------------------------------
 
-
-macro(build_tool tool_name tool_files)
-	find_package(Qt5Widgets REQUIRED)
-	find_package(Qt5PrintSupport REQUIRED)
-	find_package(Qt5Core REQUIRED)
-	add_definitions(-std=c++11)
-    add_executable(${tool_name} ${tool_files})
-    target_include_directories(${tool_name} PUBLIC ../include)
-	target_link_libraries(${tool_name} LINK_PUBLIC mgui)
-	target_link_libraries(${tool_name} LINK_PUBLIC Qt5::Widgets Qt5::PrintSupport Qt5::Core)
-endmacro()
-
-build_tool(gui_uav gui_uav/main.cpp)
-
+# Macro for tool using ROS components
 find_package(catkin COMPONENTS )
 if(${catkin_FOUND})
 	catkin_package(
@@ -48,3 +35,19 @@ if(${catkin_FOUND})
 	endmacro()
 	build_ros_tool(receiver_uav receiver_uav/main.cpp)
 endif(${catkin_FOUND})
+
+# Macro for tool without using ROS components
+macro(build_tool tool_name tool_files)
+	find_package(Qt5Widgets REQUIRED)
+	find_package(Qt5PrintSupport REQUIRED)
+	find_package(Qt5Core REQUIRED)
+	add_definitions(-std=c++11)
+    add_executable(${tool_name} ${tool_files})
+    target_include_directories(${tool_name} PUBLIC ../include)
+	target_link_libraries(${tool_name} LINK_PUBLIC mgui)
+	target_link_libraries(${tool_name} LINK_PUBLIC Qt5::Widgets Qt5::PrintSupport Qt5::Core)
+endmacro()
+
+build_tool(gui_uav gui_uav/main.cpp)
+
+build_tool(gui_pcl gui_pcl/main.cpp)

@@ -22,8 +22,9 @@
 #ifndef GUIS_PCLVIEWER_GUI_H
 #define GUIS_PCLVIEWER_GUI_H
 
-#include <iostream>
 #include <QMainWindow>
+
+#include <iostream>
 #include <fstream>
 #include <string>
 #include <sstream>
@@ -42,8 +43,14 @@
 #include <pcl/common/transforms.h>
 #include <pcl/visualization/pcl_visualizer.h>
 #include <pcl/conversions.h>
+#include <pcl/filters/voxel_grid.h>
 
 #include <vtkRenderWindow.h>
+
+#include <fastcom/Subscriber.h>
+#include <fastcom/Publisher.h>
+
+#include <motion_planning/planners/rrtstar.h>
 
 typedef pcl::PointXYZ PointT1;
 typedef pcl::PointCloud<PointT1> PointCloudT1;
@@ -70,6 +77,12 @@ public:
     /// \param _argv: from main
     /// \return true if params are good or without errors, false if something failed
     bool configureGUI(int _argc, char **_argv);
+
+    struct pose{
+		float x;
+		float y;
+		float z;
+	    };
 
 signals:
     /// Signal that warns that there is a change in the pose of the uav
@@ -123,11 +136,12 @@ private:
     Ui::PCLViewer_gui *ui;
 
     boost::shared_ptr<pcl::visualization::PCLVisualizer> mViewer;
-    PointCloudT1::Ptr mCloudT1;
-    PointCloudT2::Ptr mCloudT2;
+    PointCloudT1::Ptr mCloudT1, mCloudT1Filtered;
+    PointCloudT2::Ptr mCloudT2, mCloudT2Filtered;
     pcl::PolygonMesh mUntransformedUav;
 
     std::chrono::time_point<std::chrono::high_resolution_clock> mLastTimePose;
+    fastcom::Subscriber<pose> *mSubsPose;
 
     bool mConvertAndSave = false;
     bool mUsePCD = false;
@@ -139,17 +153,18 @@ private:
     std::string mTypePoint = "";
     std::string mTypeCallbackPose = "";
     std::string mNameCallbackPose = "";
+    std::string mIPCallbackPose = "";
     int mPortCallbackPose = 0;
     std::string mTypeModelPose = "";
     std::string mPathModelPose = "";
 
     rapidjson::Document mConfigFile;
 
-    int mContSpheres = 0;
+    int mContSpheres = 1;
     bool mEndSub = false;
 
     std::vector<std::pair<int, std::vector<double>>> mWayPoints;
-    float mPoseX = 0.0, mPoseY = 0.0, mPoseZ = 0.0, mPoseOX = 0.0, mPoseOY = 0.0, mPoseOZ = 0.0, mPoseOW = 0.0;
+    float mPoseX = 0.0, mPoseY = 0.0, mPoseZ = 0.0, mPoseOX = 0.0, mPoseOY = 0.0, mPoseOZ = 0.0, mPoseOW = 1.0;
 
     std::mutex mObjectLock;
 

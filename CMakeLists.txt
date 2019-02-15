@@ -90,6 +90,13 @@ find_package(fastcom REQUIRED)
 list(APPEND MGUI_DEFINITIONS "MGUI_USE_FASTCOM")
 
 #########################################
+## Load motion_planning
+if(${USE_GUI})
+	find_package(motion_planning REQUIRED)
+	list(APPEND MGUI_DEFINITIONS "MGUI_USE_MOTION_PLANNIG")
+endif(${USE_GUI})
+
+#########################################
 ## Load Qt5
 if(${USE_GUI})
 	find_package(Qt5Widgets REQUIRED)
@@ -171,6 +178,7 @@ if(${USE_GUI})
 	target_include_directories(${PROJECT_NAME} PUBLIC ${PCL_INCLUDE_DIRS})
 	target_link_libraries(${PROJECT_NAME} LINK_PUBLIC ${PCL_LIBRARIES})
 	target_link_libraries(${PROJECT_NAME} LINK_PUBLIC Marble)
+	target_link_libraries(${PROJECT_NAME} PRIVATE motion_planning::motion_planning)
 endif()
 
 if(${catkin_FOUND})
