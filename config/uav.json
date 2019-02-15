@@ -1,6 +1,6 @@
 {	
-	"ip_sender":"",
-	"ip_receiver":"",
+	"ip_sender":"127.0.0.1",
+	"ip_receiver":"127.0.0.1",
 	"portCommand":9000,
 	"portState":9001,
 	"portPose":9002,

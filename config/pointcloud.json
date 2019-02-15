@@ -8,7 +8,7 @@
 	"use_txt":false,
 	"dir_txt":"/home/polux/programming/catkin_mgui/src/mgui/bridges/AlgodonalesAerob.pts",
 	"type_point":"PointXYZRGB",
-	"type_callback":"",
+	"type_callback":"fastcom",
 	"callback_name":"",
 	"callback_port":9004,
 	"type_model_pose":"STL",
