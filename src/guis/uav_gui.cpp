@@ -57,6 +57,12 @@ UAV_gui::UAV_gui(QWidget *parent) :
     connect(this, &UAV_gui::stateChanged , this, &UAV_gui::updateState);
     connect(this, &UAV_gui::velChanged , this, &UAV_gui::updateVel);
 
+    scene_ = new QGraphicsScene(this);
+    QImage image;
+    image.load("src/mgui/logos/GRVC_logo.png");
+    scene_->addPixmap(QPixmap::fromImage(image));
+    ui->graphicsView_grvc->setScene(scene_);
+
     mapWidget_= new Marble::MarbleWidget();
     mapWidget_->setProjection(Marble::Mercator);
     mapWidget_->setMapThemeId("earth/openstreetmap/openstreetmap.dgml");

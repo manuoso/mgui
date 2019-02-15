@@ -730,6 +730,16 @@
               </property>
              </widget>
             </item>
+            <item row="20" column="3" colspan="2">
+             <widget class="QGraphicsView" name="graphicsView_grvc">
+              <property name="maximumSize">
+               <size>
+                <width>205</width>
+                <height>105</height>
+               </size>
+              </property>
+             </widget>
+            </item>
            </layout>
           </item>
          </layout>

@@ -24,6 +24,9 @@
 
 #include <QMainWindow>
 #include <QTextStream>
+#include <QGraphicsScene>
+#include <QGraphicsView>
+#include <QGraphicsItem>
 
 #include <iostream>
 #include <thread>
@@ -135,6 +138,8 @@ class UAV_gui : public QMainWindow {
 
         private:
             Ui::UAV_gui *ui;
+
+            QGraphicsScene *scene_;
 
             Marble::MarbleWidget *mapWidget_;
 
