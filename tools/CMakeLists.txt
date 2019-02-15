@@ -27,10 +27,10 @@ endmacro()
 
 build_tool(gui_uav gui_uav/main.cpp)
 
-find_package(catkin COMPONENTS cv_bridge image_transport)
+find_package(catkin COMPONENTS uav_abstraction_layer)
 if(${catkin_FOUND})
 	catkin_package(
-	  	CATKIN_DEPENDS roscpp
+	  	CATKIN_DEPENDS roscpp uav_abstraction_layer
 	)
 	macro(build_ros_tool tool_name tool_files)
 	    add_executable(${tool_name} ${tool_files})
