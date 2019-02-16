@@ -51,7 +51,7 @@ class UAV_receiver
 
     /// Struct for send commands to the UAV
     struct command{
-        std::string type;
+        int type;
         float height;
         float x;
         float y;
@@ -80,10 +80,10 @@ class UAV_receiver
 
     grvc::ual::UAL *ual_;
 
-    fastcom::Subscriber<command> *subsCommand_;
-    fastcom::Publisher<std::string> *pubState_;
-    fastcom::Publisher<pose> *pubPose_;
-    fastcom::Publisher<pose> *pubVel_;
+    fastcom::Subscriber<command> *subsCommand_ = nullptr;
+    fastcom::Publisher<int> *pubState_ = nullptr;
+    fastcom::Publisher<pose> *pubPose_ = nullptr;
+    fastcom::Publisher<pose> *pubVel_ = nullptr;
 
     float height_, x_, y_, z_; 
 

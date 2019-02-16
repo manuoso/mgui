@@ -62,7 +62,7 @@ class UAV_gui : public QMainWindow {
 
         /// Struct for send commands to the UAV
         struct command{
-            std::string type;
+            int type;
             float height;
             float x;
             float y;
@@ -145,12 +145,13 @@ class UAV_gui : public QMainWindow {
 
             rapidjson::Document configFile_;
 
-            fastcom::Publisher<command> *pubCommand_;
-            fastcom::Subscriber<std::string> *subsState_;
-            fastcom::Subscriber<pose> *subsPose_;
-            fastcom::Subscriber<pose> *subsVel_;
+            fastcom::Publisher<command> *pubCommand_ = nullptr;
+            fastcom::Subscriber<int> *subsState_ = nullptr;
+            fastcom::Subscriber<pose> *subsPose_ = nullptr;
+            fastcom::Subscriber<pose> *subsVel_ = nullptr;
 
-            std::thread velocityThread_, localPoseThread_, getVelThread_;
+            std::thread *velocityThread_, *localPoseThread_, *getVelThread_;
+            std::mutex objectLock_;
             
             std::chrono::time_point<std::chrono::high_resolution_clock> lastTimePose_, lastTimeVel_, lastTimeSendVel_;	
             std::vector<std::pair<int, std::vector<double>>> waypoints_;

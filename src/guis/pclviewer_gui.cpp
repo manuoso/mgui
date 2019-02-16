@@ -125,10 +125,8 @@ bool PCLViewer_gui::configureGUI(int _argc, char **_argv)
         auto t1 = std::chrono::high_resolution_clock::now();
         if(std::chrono::duration_cast<std::chrono::milliseconds>(t1 - lastTimePose_).count() > 50){
             emit poseUAVchanged(); 
+            lastTimePose_ = t1;
         }
-
-        lastTimePose_ = t1;
-
     });
     
     return true;

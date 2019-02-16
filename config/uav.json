@@ -1,8 +1,8 @@
 {	
-	"ip_sender":"127.0.0.1",
-	"ip_receiver":"127.0.0.1",
-	"portCommand":9000,
-	"portState":9001,
-	"portPose":9002,
-	"portVel":9003
+	"ip_sender":"0.0.0.0",
+	"ip_receiver":"0.0.0.0",
+	"portCommand":8000,
+	"portState":8001,
+	"portPose":8002,
+	"portVel":8003
 }

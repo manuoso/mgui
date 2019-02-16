@@ -10,8 +10,8 @@
 	"type_point":"PointXYZRGB",
 	"type_callback":"fastcom",
 	"callback_name":"",
-	"callback_ip":"127.0.0.1",
-	"callback_port":9004,
+	"callback_ip":"0.0.0.0",
+	"callback_port":8004,
 	"type_model_pose":"STL",
 	"model_pose":"/home/polux/programming/catkin_mgui/src/mgui/uav_models/arbi.stl"
 }

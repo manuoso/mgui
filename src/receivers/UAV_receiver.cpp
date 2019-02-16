@@ -52,62 +52,65 @@ bool UAV_receiver::init(int _argc, char**_argv) {
 
     // Init UAV controller
     ual_ = new grvc::ual::UAL(_argc, _argv);
+    std::cout << "UAL initialized" << std::endl;
 
     // Initialize Fastcom publishers and subscribers
     subsCommand_ = new fastcom::Subscriber<command>(ip, portCommand);
-    pubState_ = new fastcom::Publisher<std::string>(portState);
+    pubState_ = new fastcom::Publisher<int>(portState);
     pubPose_ = new fastcom::Publisher<pose>(portPose);
     pubVel_ = new fastcom::Publisher<pose>(portVel);
 
     // Callback of received commands
-    subsCommand_->attachCallback([&](command &_data){
-        if(_data.type == "takeoff"){
+    //std::cout << "Commands callback" << std::endl;
+    subsCommand_->attachCallback([&](const command &_data){
+        if(_data.type == 1){
+            state_ = eState::WAIT;
+        }else if(_data.type == 2){
             state_ = eState::TAKEOFF;
             height_ = _data.height;
-        }else if(_data.type == "land"){
+        }else if(_data.type == 3){
             state_ = eState::LAND;
-        }else if(_data.type == "position"){
+        }else if(_data.type == 4){
             state_ = eState::MOVE;
             x_ = _data.x;
             y_ = _data.y;
             z_ = _data.z;
-        }else if(_data.type == "velocity"){
+        }else if(_data.type == 5){
             state_ = eState::MOVE_VEL;
             x_ = _data.x;
             y_ = _data.y;
             z_ = _data.z;
-        }else if(_data.type == "wait"){
-            state_ = eState::WAIT;
-        }else if(_data.type == "emergency"){
+        }else if(_data.type == 6){
             state_ = eState::EXIT;
         }else{
-            std::cout << "Unrecognized state" << std::endl;
+            std::cout << "Unrecognized command state" << std::endl;
             state_ = eState::WAIT;
         }
     });
 
     // Publisher State thread
+    //std::cout << "State publisher thread" << std::endl;
     stateThread_ = std::thread([&](){
         while(!fin_ && ros::ok()){
-            std::string msg;
+            int msg;
             switch(state_){
                 case eState::WAIT:
-                    msg = "WAIT";
+                    msg = 1;
                     break;
                 case eState::TAKEOFF:
-                    msg = "TAKEOFF";
+                    msg = 2;
                     break;
                 case eState::LAND:
-                    msg = "LANDING";
+                    msg = 3;
                     break;
                 case eState::MOVE:
-                    msg = "MOVE_POSITION";
+                    msg = 4;
                     break;
                 case eState::MOVE_VEL:
-                    msg = "MOVE_VELOCITY";
+                    msg = 5;
                     break;
                 case eState::EXIT:
-                    msg = "EXIT";
+                    msg = 6;
                     break;
             }
             pubState_->publish(msg);
@@ -116,11 +119,11 @@ bool UAV_receiver::init(int _argc, char**_argv) {
     });
 
     // Publisher Pose thread
+    //std::cout << "Pose publisher thread" << std::endl;
     poseThread_ = std::thread([&](){
         while(!fin_ && ros::ok()){
             // Get pose
             grvc::ual::Pose p = ual_->pose();
-
             pose sendPose;
             sendPose.x = p.pose.position.x;
             sendPose.y = p.pose.position.y;
@@ -131,11 +134,11 @@ bool UAV_receiver::init(int _argc, char**_argv) {
     });
 
     // Publisher Velocity thread
+    //std::cout << "Velocity publisher thread" << std::endl;
     velThread_ = std::thread([&](){
         while(!fin_ && ros::ok()){
             // Get velocity
             grvc::ual::Velocity v = ual_->velocity();
-
             pose sendVel;
             sendVel.x = v.twist.linear.x;
             sendVel.y = v.twist.linear.y;
@@ -153,6 +156,7 @@ bool UAV_receiver::init(int _argc, char**_argv) {
 //---------------------------------------------------------------------------------------------------------------------
 bool UAV_receiver::run() {
 
+    std::cout << "Waiting to receive commands" << std::endl;
     while(!fin_ && ros::ok()){
         switch (state_) {
             case eState::WAIT:
@@ -195,7 +199,7 @@ bool UAV_receiver::run() {
                 velocity.twist.linear.y = y_;
                 velocity.twist.linear.z = z_;
                 ual_->setVelocity(velocity);
-                //state_ = eState::WAIT; // Al estar comentado seguimos manteniendo la ultima velocidad en caso de que dejemos de enviar
+                state_ = eState::WAIT;
                 break;
             }
             case eState::EXIT:
