@@ -4,5 +4,7 @@
 	"portCommand":8000,
 	"portState":8001,
 	"portPose":8002,
-	"portVel":8003
+	"portVel":8003,
+	"portCheck":8004,
+	"portWP":8005
 }

@@ -88,6 +88,7 @@ bool PCLViewer_gui::configureGUI(int _argc, char **_argv)
     nameCallbackPose_ = configFile_["callback_name"].GetString();
     ipCallbackPose_ = configFile_["callback_ip"].GetString();
     portCallbackPose_ = configFile_["callback_port"].GetInt();
+    portWaypoint_ = configFile_["wp_port"].GetInt();
 
     typeModelPose_ = configFile_["type_model_pose"].GetString();
     pathModelPose_ = configFile_["model_pose"].GetString();
@@ -105,6 +106,7 @@ bool PCLViewer_gui::configureGUI(int _argc, char **_argv)
 
     if(typeCallbackPose_ == "fastcom"){
         subsPose_ = new fastcom::Subscriber<pose>(ipCallbackPose_, portCallbackPose_);
+        pubWP_ = new fastcom::Publisher<pose>(portWaypoint_);
     }else if(typeCallbackPose_ == "ros"){
 
     }else{
@@ -296,20 +298,28 @@ void PCLViewer_gui::run_generateTray(){
 //---------------------------------------------------------------------------------------------------------------------
 void PCLViewer_gui::run_sendMision(){
 
-    
+    for(unsigned i = 0; i < waypoints_.size(); i++){
+        pose msg;
+        msg.x = waypoints_[i].second[0];
+        msg.y = waypoints_[i].second[1];
+        msg.z = waypoints_[i].second[2];
+        pubWP_->publish(msg);
+        std::this_thread::sleep_for(std::chrono::milliseconds(100)); 
+    }
 
 }
 
 //---------------------------------------------------------------------------------------------------------------------
 void PCLViewer_gui::deleteSphere(){
     
-    //waypoints_.clear();
-
-    // for(int i = 0; i < contSpheres_; i++){
-    //     std::string removeSphere = "sphere" + std::to_string(i);
-    //     viewer_->removeShape(removeSphere);
-    // }
-    // contSpheres_ = 0;
+    QList<QListWidgetItem*> items = ui->listWidget_WayPoints->selectedItems();
+    foreach(QListWidgetItem * item, items){
+        int index = ui->listWidget_WayPoints->row(item);
+        waypoints_.erase(waypoints_.begin() + index);
+        delete ui->listWidget_WayPoints->takeItem(ui->listWidget_WayPoints->row(item));
+        std::string removeSphere = "sphere" + std::to_string(index);
+        viewer_->removeShape(removeSphere);
+    }
     ui->qvtkWidget->update();
 
 }

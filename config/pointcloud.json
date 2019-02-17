@@ -11,7 +11,8 @@
 	"type_callback":"fastcom",
 	"callback_name":"",
 	"callback_ip":"0.0.0.0",
-	"callback_port":8004,
+	"callback_port":8002,
+	"wp_port":8005,
 	"type_model_pose":"STL",
 	"model_pose":"/home/polux/programming/catkin_mgui/src/mgui/uav_models/arbi.stl"
 }

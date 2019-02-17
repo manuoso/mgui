@@ -56,6 +56,7 @@ UAV_gui::UAV_gui(QWidget *parent) :
     connect(this, &UAV_gui::localPositionChanged , this, &UAV_gui::updateLocalPose);
     connect(this, &UAV_gui::stateChanged , this, &UAV_gui::updateState);
     connect(this, &UAV_gui::velChanged , this, &UAV_gui::updateVel);
+    connect(this, &UAV_gui::listWPChanged , this, &UAV_gui::updateListWP);
 
     scene_ = new QGraphicsScene(this);
     QImage image;
@@ -114,12 +115,16 @@ bool UAV_gui::configureGUI(int _argc, char **_argv){
     int portState = configFile_["portState"].GetInt();
     int portPose = configFile_["portPose"].GetInt();
     int portVel = configFile_["portVel"].GetInt();
+    int portCheck = configFile_["portCheck"].GetInt();
+    int portWP = configFile_["portWP"].GetInt();
 
     // Initialize Fastcom publishers and subscribers
     pubCommand_ = new fastcom::Publisher<command>(portCommand);
     subsState_ = new fastcom::Subscriber<int>(ip, portState);
     subsPose_ = new fastcom::Subscriber<pose>(ip, portPose);
     subsVel_ = new fastcom::Subscriber<pose>(ip, portVel);
+    subsCheck_ = new fastcom::Subscriber<int>(ip, portCheck);
+    subsWP_ = new fastcom::Subscriber<pose>(ip, portWP);
 
     // Callback of received commands
     subsState_->attachCallback([&](const int &_data){
@@ -174,6 +179,32 @@ bool UAV_gui::configureGUI(int _argc, char **_argv){
         velUAV_.y = _data.y;
         velUAV_.z = _data.z;
         objectLock_.unlock();
+    });
+
+    // Callback of received check
+    subsCheck_->attachCallback([&](const int &_data){
+        if(_data == 1){
+            sendNextWP = true;
+        }else{
+            std::cout << "Received unrecognized check" << std::endl;
+            sendNextWP = false;
+        }
+    });
+
+    // Callback of received waypoints
+    subsWP_->attachCallback([&](const pose &_data){
+        objectLock_.lock();
+        float x = _data.x;
+        float y = _data.y;
+        float z = _data.z;
+        objectLock_.unlock();
+
+        int id = idWP_;
+        idWP_++;
+        std::vector<double> point = {x, y, z};
+        waypoints_.push_back(std::make_pair(id, point));
+
+        emit listWPChanged();
     });
 
     lastTimePose_ = std::chrono::high_resolution_clock::now();
@@ -376,6 +407,7 @@ void UAV_gui::stop_velocity(){
 //---------------------------------------------------------------------------------------------------------------------
 void UAV_gui::run_waypoints(){
 
+    sendNextWP = false;
     for(unsigned i = 0; i < waypoints_.size(); i++){
         command msg;
         msg.type = 4;
@@ -384,11 +416,13 @@ void UAV_gui::run_waypoints(){
         msg.z = waypoints_[i].second[2];
         if(!sendVelocity_){
             pubCommand_->publish(msg);
-            }else{
+        }else{
             std::cout << "Cant send position while you are sending velocity" << std::endl;
         }
-
-        // 666 TODO: ESPERAR CONFIRMACIÓN ANTES DE ENVIAR EL SIGUIENTE WP?
+        while(!sendNextWP){
+            std::this_thread::sleep_for(std::chrono::milliseconds(100)); 
+        }
+        sendNextWP = false;
     }
 
 }
@@ -398,7 +432,6 @@ void UAV_gui::delete_waypoints(){
 
     QList<QListWidgetItem*> items = ui->listWidget_WayPoints->selectedItems();
     foreach(QListWidgetItem * item, items){
-
         int index = ui->listWidget_WayPoints->row(item);
         waypoints_.erase(waypoints_.begin() + index);
         delete ui->listWidget_WayPoints->takeItem(ui->listWidget_WayPoints->row(item));
@@ -445,4 +478,15 @@ void UAV_gui::updateState(){
     objectLock_.unlock();
 }
 
+//---------------------------------------------------------------------------------------------------------------------
+void UAV_gui::updateListWP(){
+    objectLock_.lock();
+    int id = idWP_-1;
+    float x = waypoints_[id].second[0];
+    float y = waypoints_[id].second[1];
+    float z = waypoints_[id].second[2];
+    std::string swaypoint = "ID: " + std::to_string(id) + " , " + "X: " + std::to_string(x) + " , " +  "Y: " + std::to_string(y) + " , " + "Z: " + std::to_string(z);
+    ui->listWidget_WayPoints->addItem(QString::fromStdString(swaypoint));
+    objectLock_.unlock();
+}
 

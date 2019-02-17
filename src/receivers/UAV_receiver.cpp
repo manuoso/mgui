@@ -49,6 +49,7 @@ bool UAV_receiver::init(int _argc, char**_argv) {
     int portState = configFile_["portState"].GetInt();
     int portPose = configFile_["portPose"].GetInt();
     int portVel = configFile_["portVel"].GetInt();
+    int portCheck = configFile_["portCheck"].GetInt();
 
     // Init UAV controller
     ual_ = new grvc::ual::UAL(_argc, _argv);
@@ -59,6 +60,7 @@ bool UAV_receiver::init(int _argc, char**_argv) {
     pubState_ = new fastcom::Publisher<int>(portState);
     pubPose_ = new fastcom::Publisher<pose>(portPose);
     pubVel_ = new fastcom::Publisher<pose>(portVel);
+    pubCheck_ = new fastcom::Publisher<int>(portCheck);
 
     // Callback of received commands
     //std::cout << "Commands callback" << std::endl;
@@ -188,6 +190,8 @@ bool UAV_receiver::run() {
                 waypoint.pose.orientation.z = 0;
                 waypoint.pose.orientation.w = 1;
                 ual_->goToWaypoint(waypoint);
+                int check = 1;
+                pubCheck_->publish(check);
                 state_ = eState::WAIT;
                 break;
             }

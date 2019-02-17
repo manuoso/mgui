@@ -67,14 +67,14 @@ class UAV_gui : public QMainWindow {
             float x;
             float y;
             float z;
-            };
+        };
 
         /// Struct for received pose and send the velocity of the UAV
         struct pose{
             float x;
             float y;
             float z;
-            };
+        };
 
     signals:
         /// Signal that warns that there is a change in the pose of the uav
@@ -85,6 +85,9 @@ class UAV_gui : public QMainWindow {
         
         /// Signal that warns that there is a change in the state of the uav
         void stateChanged();
+
+        /// Signal that warns that there is a change in the list of waypoints
+        void listWPChanged();
 
         private slots:
             /// Slot that send takeoff to the UAV
@@ -127,14 +130,17 @@ class UAV_gui : public QMainWindow {
             void emergency();
 
         private:
-            /// Thread that update local position of the UAV
+            /// Method that update local position of the UAV
             void updateLocalPose();
 
-            /// Thread that update the velocity of the UAV
+            /// Method that update the velocity of the UAV
             void updateVel();
 
-            /// Thread that update the state of the UAV
+            /// Method that update the state of the UAV
             void updateState();
+
+            /// Method that update the list of waypoints to send
+            void updateListWP();
 
         private:
             Ui::UAV_gui *ui;
@@ -149,6 +155,8 @@ class UAV_gui : public QMainWindow {
             fastcom::Subscriber<int> *subsState_ = nullptr;
             fastcom::Subscriber<pose> *subsPose_ = nullptr;
             fastcom::Subscriber<pose> *subsVel_ = nullptr;
+            fastcom::Subscriber<int> *subsCheck_ = nullptr;
+            fastcom::Subscriber<pose> *subsWP_ = nullptr;
 
             std::thread *velocityThread_, *localPoseThread_, *getVelThread_;
             std::mutex objectLock_;
@@ -163,6 +171,7 @@ class UAV_gui : public QMainWindow {
             bool printLocalPose_ = false;
             bool printVel_ = false;
             bool sendVelocity_ = false;
+            bool sendNextWP = false;
 };
 
 #endif // GUIS_UAV_GUI_H

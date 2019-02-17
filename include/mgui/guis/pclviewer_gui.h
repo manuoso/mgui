@@ -142,7 +142,8 @@ private:
     pcl::PolygonMesh untransformedUav_;
 
     std::chrono::time_point<std::chrono::high_resolution_clock> lastTimePose_;
-    fastcom::Subscriber<pose> *subsPose_;
+    fastcom::Subscriber<pose> *subsPose_ = nullptr;
+    fastcom::Publisher<pose> *pubWP_ = nullptr;
 
     bool convertAndSave_ = false;
     bool usePCD_ = false;
@@ -156,12 +157,13 @@ private:
     std::string nameCallbackPose_ = "";
     std::string ipCallbackPose_ = "";
     int portCallbackPose_ = 0;
+    int portWaypoint_ = 0;
     std::string typeModelPose_ = "";
     std::string pathModelPose_ = "";
 
     rapidjson::Document configFile_;
 
-    int contSpheres_ = 1;
+    int contSpheres_ = 0;
     bool endSub_ = false;
 
     std::vector<std::pair<int, std::vector<double>>> waypoints_;

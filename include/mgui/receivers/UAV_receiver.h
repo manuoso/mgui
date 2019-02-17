@@ -84,6 +84,7 @@ class UAV_receiver
     fastcom::Publisher<int> *pubState_ = nullptr;
     fastcom::Publisher<pose> *pubPose_ = nullptr;
     fastcom::Publisher<pose> *pubVel_ = nullptr;
+    fastcom::Publisher<int> *pubCheck_ = nullptr;
 
     float height_, x_, y_, z_; 
 
