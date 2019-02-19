@@ -164,6 +164,8 @@ private:
 
     rapidjson::Document configFile_;
 
+    float safeDistance_ = 0.5;
+    bool drawTrajectory_ = false;
     int iterations_ = 0;
     int contSpheres_ = 0;
     int cont_ = 0;

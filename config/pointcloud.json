@@ -2,15 +2,17 @@
 	"save_pcd_ply":false,
 	"use_ply":false,
 	"dir_ply":"/home/polux/programming/catkin_mgui/src/mgui/bridges/Bridge_Algodonales.ply",
-	"use_pcd":true,
+	"use_pcd":false,
 	"dir_pcd":"/home/polux/programming/catkin_mgui/src/mgui/bridges/Bridge_Algodonales.pcd",
-	"use_txt":false,
-	"dir_txt":"/home/polux/programming/catkin_mgui/src/mgui/bridges/AlgodonalesAerob.pts",
+	"use_txt":true,
+	"dir_txt":"/home/bardo91/programming/mgui/bridges/puente_etsi.pts",
 	"type_point":"PointXYZRGB",
 	"leica_init_x":0.0,
 	"leica_init_y":0.0,
 	"leica_init_z":0.0,
 	"iterations_traj":20000,
+	"draw_complete_tree":false,
+	"safe_distance":0.5,
 	"use_spline":true,
 	"type_callback":"fastcom",
 	"callback_name":"",
@@ -18,5 +20,5 @@
 	"callback_port":8002,
 	"wp_port":8005,
 	"type_model_pose":"STL",
-	"model_pose":"/home/polux/programming/catkin_mgui/src/mgui/uav_models/arbi.stl"
+	"model_pose":"/home/bardo91/programming/mgui/uav_models/arbi.stl"
 }

@@ -22,6 +22,9 @@
 #include <mgui/guis/pclviewer_gui.h>
 #include <guis/ui_pclviewer_gui.h>
 
+#include <pcl/features/normal_3d.h>
+#include <random>
+
 //---------------------------------------------------------------------------------------------------------------------
 // PUBLIC 
 //---------------------------------------------------------------------------------------------------------------------
@@ -72,6 +75,8 @@ bool PCLViewer_gui::configureGUI(int _argc, char **_argv)
     }
 
     convertAndSave_ = configFile_["save_pcd_ply"].GetBool();
+    drawTrajectory_ = configFile_["draw_complete_tree"].GetBool();
+    safeDistance_ = configFile_["safe_distance"].GetDouble();
 
     usePCD_ = configFile_["use_pcd"].GetBool();
     dirPCD_ = configFile_["dir_pcd"].GetString();
@@ -178,10 +183,13 @@ void PCLViewer_gui::run_generateTray(){
 
     }else if(typePoint_ == "PointXYZRGB"){
         
+        std::random_device rd{};
+        std::mt19937 gen{rd()};
+
         if(waypoints_.size() > 0){
             
             // Add constraint
-            pcl::octree::OctreePointCloudSearch<pcl::PointXYZRGB> octree(0.1);
+            pcl::octree::OctreePointCloudSearch<pcl::PointXYZRGB> octree(0.05);
             octree.setInputCloud(cloudT2_);
             octree.addPointsFromInputCloud();
 
@@ -195,50 +203,115 @@ void PCLViewer_gui::run_generateTray(){
             vtkSmartPointer<vtkPoints> covisibilityNodesTraj;
             vtkSmartPointer<vtkUnsignedCharArray> covisibilityNodeColors;
 
-            for(unsigned i = 0; i < waypoints_.size(); i++){
+            // Intantiate constraints
+            mp::Constraint c1 = [&](const Eigen::Vector3f &_orig, const Eigen::Vector3f &_dest){
+                pcl::PointXYZRGB query;
+                query.x = _dest[0];
+                query.y = _dest[1];
+                query.z = _dest[2];
+                std::vector<int> index;
+                std::vector< float > dist;
+                octree.nearestKSearch(query, 1, index, dist);
+                
+                return *std::min_element(dist.begin(), dist.end()) > safeDistance_;
+            };
 
+            mp::Constraint c2 = [&](const Eigen::Vector3f & _old, const Eigen::Vector3f &_new){
+                pcl::octree::OctreePointCloudSearch<pcl::PointXYZRGB>::AlignedPointTVector intersections;
+                octree.getIntersectedVoxelCenters({leicaX_, leicaY_, leicaZ_}, {_old[0]-leicaX_, _old[1]-leicaY_, _old[2]-leicaZ_}, intersections);
+                
+                return intersections.size() == 0;
+            };
+
+            // Create approximation points.
+            std::vector<std::vector<float>> targetPoints;
+            for(unsigned i = 0; i < waypoints_.size(); i++){
+                std::vector<int> pointsIds;
+                std::vector<float> distances;
+                pcl::PointXYZRGB p;
+                p.x = waypoints_[i].second[0];
+                p.y = waypoints_[i].second[1];
+                p.z = waypoints_[i].second[2];
+                
+                octree.radiusSearch(p, 0.15, pointsIds, distances);
+                Eigen::Vector4f plane_parameters; 
+                float curvature;
+                pcl::computePointNormal(*cloudT2_, pointsIds, plane_parameters, curvature);
+
+
+                Eigen::Vector3f newTarget = {
+                    p.x + plane_parameters[0]*safeDistance_*1.1,
+                    p.y + plane_parameters[1]*safeDistance_*1.1,
+                    p.z + plane_parameters[2]*safeDistance_*1.1
+                };
+
+                if(!c2(newTarget, newTarget) || !c1(newTarget, newTarget)){
+                    newTarget = {
+                        p.x - plane_parameters[0]*safeDistance_*1.1,
+                        p.y - plane_parameters[1]*safeDistance_*1.1,
+                        p.z - plane_parameters[2]*safeDistance_*1.1
+                    };
+                }
+
+                targetPoints.push_back({
+                                        newTarget[0],
+                                        newTarget[1],
+                                        newTarget[2]
+                                        });
+
+
+                std::string sSphere = "sphere" + std::to_string(contSpheres_);
+                QString qRadSphere;
+                qRadSphere = ui->lineEdit_RadSphere->text();
+                double radSphere;
+                radSphere = qRadSphere.toDouble(); 
+
+                viewer_->addSphere(pcl::PointXYZ(
+                                                    newTarget[0],
+                                                    newTarget[1],
+                                                    newTarget[2]
+                                                ), radSphere, 0, 1, 0, sSphere);
+                ui->qvtkWidget->update();
+                contSpheres_++;
+            }
+
+            for(unsigned i = 0; i < targetPoints.size(); i++){
+                
                 // Config planner
                 mp::RRTStar planner;
                 if(i == 0){
                     planner.initPoint({poseX_, poseY_, poseZ_});
                     planner.dimensions( poseX_, poseY_, poseZ_,
-                                        waypoints_[i].second[0], waypoints_[i].second[1], waypoints_[i].second[2]);
+                                        targetPoints[i][0], targetPoints[i][1], targetPoints[i][2]);
                 }else{
-                    planner.initPoint({waypoints_[i-1].second[0], waypoints_[i-1].second[1], waypoints_[i-1].second[2]});
-                    planner.dimensions( waypoints_[i-1].second[0], waypoints_[i-1].second[0], waypoints_[i-1].second[0],
-                                        waypoints_[i].second[0], waypoints_[i].second[1], waypoints_[i].second[2]);
+                    planner.initPoint({targetPoints[i-1][0], targetPoints[i-1][1], targetPoints[i-1][2]});
+                    planner.dimensions( targetPoints[i-1][0], targetPoints[i-1][0], targetPoints[i-1][0],
+                                        targetPoints[i][0], targetPoints[i][1], targetPoints[i][2]);
                 }
 
-                planner.targetPoint({waypoints_[i].second[0], waypoints_[i].second[1], waypoints_[i].second[2]});
+                planner.targetPoint({targetPoints[i][0], targetPoints[i][1], targetPoints[i][2]});
                 
                 // planner.enableDebugVisualization(viz.rawViewer());
                 planner.iterations(iterations_);
                 
                 // 666 TODO: PROBLEMS WHEN HAVE TWO POINTS THAT PRODUCE COLISIONS ON THE BRIDGE
                 float safeDist = 0.5;
-                mp::Constraint c1 = [&](const Eigen::Vector3f &_orig, const Eigen::Vector3f &_dest){
-                    pcl::PointXYZRGB query;
-                    query.x = _dest[0];
-                    query.y = _dest[1];
-                    query.z = _dest[2];
-                    std::vector<int> index;
-                    std::vector< float > dist;
-                    octree.nearestKSearch(query, 1, index, dist);
-                    
-                    return dist[0] > safeDist;
-                };
-                //planner.addConstraint(c1);
+                planner.addConstraint(c1);
 
                 // 666 TODO: CONSTRAINT C2 IS NOT WORKING!!!
-                mp::Constraint c2 = [&](const Eigen::Vector3f & _old, const Eigen::Vector3f &_new){
-                    pcl::octree::OctreePointCloudSearch<pcl::PointXYZRGB>::AlignedPointTVector intersections;
-                    octree.getIntersectedVoxelCenters({leicaX_, leicaY_, leicaZ_}, {_old[0]-leicaX_, _old[1]-leicaY_, _old[2]-leicaZ_}, intersections);
-                    
-                    return intersections.size() == 0;
-                };
                 //planner.addConstraint(c2);
 
                 // Compute traj
+                std::normal_distribution<> gaussianX{targetPoints[i][0],1.5};
+                std::normal_distribution<> gaussianY{targetPoints[i][1],1.5};
+                std::normal_distribution<> gaussianZ{targetPoints[i][2],1.5};
+                planner.samplerFunction([&](){
+                    return Eigen::Vector3f({
+                        gaussianX(gen),
+                        gaussianY(gen),
+                        gaussianZ(gen)
+                    });
+                });
                 auto traj = planner.compute();
                 planner.tree(nodes, nodesInfo);
 
@@ -247,23 +320,24 @@ void PCLViewer_gui::run_generateTray(){
                 treeBase->Allocate();
                 covisibilityNodes = vtkSmartPointer<vtkPoints>::New();
 
-                // Fill-up with nodes
-                for(unsigned i = 0; i <  nodes->size(); i++){
-                    covisibilityNodes->InsertNextPoint(     nodes->points[i].x, 
-                                                            nodes->points[i].y, 
-                                                            nodes->points[i].z);
-                    if(i > 0){
-                        vtkIdType connectivity[2];
-                        connectivity[0] = nodesInfo[i].id_;
-                        connectivity[1] = nodesInfo[i].parent_;
-                        treeBase->InsertNextCell(VTK_LINE,2,connectivity);
+                if(drawTrajectory_){
+                    // Fill-up with nodes
+                    for(unsigned i = 0; i <  nodes->size(); i++){
+                        covisibilityNodes->InsertNextPoint(     nodes->points[i].x, 
+                                                                nodes->points[i].y, 
+                                                                nodes->points[i].z);
+                        if(i > 0){
+                            vtkIdType connectivity[2];
+                            connectivity[0] = nodesInfo[i].id_;
+                            connectivity[1] = nodesInfo[i].parent_;
+                            treeBase->InsertNextCell(VTK_LINE,2,connectivity);
+                        }
                     }
+
+                    treeBase->SetPoints(covisibilityNodes);
+                    viewer_->addModelFromPolyData(treeBase, "treeRRT_"+std::to_string(cont_));
+                    ui->qvtkWidget->update();
                 }
-
-                treeBase->SetPoints(covisibilityNodes);
-                viewer_->addModelFromPolyData(treeBase, "treeRRT_"+std::to_string(cont_));
-                ui->qvtkWidget->update();
-
                 // Create new graph
                 covisibilityGraph = vtkSmartPointer<vtkPolyData>::New();
                 covisibilityGraph->Allocate();
