@@ -171,6 +171,8 @@ void PCLViewer_gui::addWaypoint(){
     std::string swaypoint = "ID: " + std::to_string(id) + " , " + "X: " + std::to_string(x) + " , " +  "Y: " + std::to_string(y) + " , " + "Z: " + std::to_string(z);
     
     ui->listWidget_WayPoints->addItem(QString::fromStdString(swaypoint));
+
+    removeOldSphere_ = false;
 }
 
 //---------------------------------------------------------------------------------------------------------------------
@@ -443,6 +445,7 @@ bool PCLViewer_gui::extractPointCloud(std::string _dir)
 {   
     // Set up the QVTK window
     viewer_.reset(new pcl::visualization::PCLVisualizer("viewer", false));
+    viewer_->setBackgroundColor(153, 153, 153);
     ui->qvtkWidget->SetRenderWindow(viewer_->getRenderWindow());
     viewer_->setupInteractor(ui->qvtkWidget->GetInteractor(), ui->qvtkWidget->GetRenderWindow());
     ui->qvtkWidget->update();
@@ -590,6 +593,12 @@ void PCLViewer_gui::pointPickingOccurred(const pcl::visualization::PointPickingE
     _event.getPoint(x, y, z);
     //std::cout << "Position (" << x << ", " << y << ", " << z << ")" << std::endl;
 
+    if(removeOldSphere_){
+        std::string removeSphere = "sphere" + std::to_string(contSpheres_-1);
+        viewer_->removeShape(removeSphere);
+        contSpheres_--;
+    }
+
     QString qRadSphere;
     qRadSphere = ui->lineEdit_RadSphere->text();
     double radSphere;
@@ -609,6 +618,8 @@ void PCLViewer_gui::pointPickingOccurred(const pcl::visualization::PointPickingE
     ui->lineEdit_MX->setText(QString::number(x));
     ui->lineEdit_MY->setText(QString::number(y));
     ui->lineEdit_MZ->setText(QString::number(z));
+
+    removeOldSphere_ = true;
 
 }
 

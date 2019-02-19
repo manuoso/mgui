@@ -171,6 +171,7 @@ private:
     int cont_ = 0;
     bool endSub_ = false;
     bool useSpline_ = false;
+    bool removeOldSphere_ = false;
 
     std::vector<std::pair<int, std::vector<double>>> waypoints_;
 
