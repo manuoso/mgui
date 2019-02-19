@@ -84,6 +84,13 @@ bool PCLViewer_gui::configureGUI(int _argc, char **_argv)
     
     typePoint_ = configFile_["type_point"].GetString();
 
+    leicaX_ = configFile_["leica_init_x"].GetDouble();
+    leicaY_ = configFile_["leica_init_y"].GetDouble();
+    leicaZ_ = configFile_["leica_init_z"].GetDouble();
+
+    iterations_ = configFile_["iterations_traj"].GetInt();
+    useSpline_ = configFile_["use_spline"].GetBool();
+
     typeCallbackPose_ = configFile_["type_callback"].GetString();
     nameCallbackPose_ = configFile_["callback_name"].GetString();
     ipCallbackPose_ = configFile_["callback_ip"].GetString();
@@ -146,21 +153,17 @@ void PCLViewer_gui::addWaypoint(){
     qy = ui->lineEdit_MY->text();
     qz = ui->lineEdit_MZ->text();
 
-    double x, y, z, xq, yq, zq, wq;
+    double x, y, z;
     x = qx.toDouble();
     y = qy.toDouble();
     z = qz.toDouble();
-    xq = 0.0;
-    yq = 0.0;
-    zq = 0.0;
-    wq = 1.0;
 
     int id = contSpheres_ - 1;
 
-    std::vector<double> point = {x, y, z, xq, yq, zq, wq};
+    std::vector<double> point = {x, y, z};
     waypoints_.push_back(std::make_pair(id, point));
 
-    std::string swaypoint = "ID: " + std::to_string(id) + " , " + "X: " + std::to_string(x) + " , " +  "Y: " + std::to_string(y) + " , " + "Z: " + std::to_string(z) + " , " + "QX: " + std::to_string(xq) + " , " + "QY: " + std::to_string(yq) + " , " + "QZ: " + std::to_string(zq) + " , " + "QW: " + std::to_string(wq);
+    std::string swaypoint = "ID: " + std::to_string(id) + " , " + "X: " + std::to_string(x) + " , " +  "Y: " + std::to_string(y) + " , " + "Z: " + std::to_string(z);
     
     ui->listWidget_WayPoints->addItem(QString::fromStdString(swaypoint));
 }
@@ -175,122 +178,154 @@ void PCLViewer_gui::run_generateTray(){
 
     }else if(typePoint_ == "PointXYZRGB"){
         
-        // Filter cloud
-        // pcl::VoxelGrid<pcl::PointXYZRGB> sor;
-        // sor.setInputCloud(cloudT2_);
-        // sor.setLeafSize(0.2f, 0.2f, 0.2f);
-        // sor.filter(*cloudT2Filtered_);
-
-        // Get min and max of cloud
-        pcl::PointXYZRGB minPt, maxPt;
-        //pcl::getMinMax3D (*cloudT2Filtered_, minPt, maxPt);
-        pcl::getMinMax3D (*cloudT2_, minPt, maxPt);
-
-        // Config planner
-        mp::RRTStar planner;
-        planner.initPoint({minPt.x, minPt.y, minPt.z});
-        planner.targetPoint({maxPt.x, maxPt.y, maxPt.z});
-        
-        // planner.enableDebugVisualization(viz.rawViewer());
-        planner.iterations(20000);
-        planner.dimensions( minPt.x, minPt.y, minPt.z,
-                            maxPt.x, maxPt.y, /*maxPt.z*/ 5);
-
-        // Add constraint
-        pcl::octree::OctreePointCloudSearch<pcl::PointXYZRGB> octree(0.1);
-        //octree.setInputCloud(cloudT2Filtered_);
-        octree.setInputCloud(cloudT2_);
-        octree.addPointsFromInputCloud();
-
-        float safeDist = 1.0;
-        mp::Constraint c1 = [&](const Eigen::Vector3f &_orig, const Eigen::Vector3f &_dest){
-            pcl::PointXYZRGB query;
-            query.x = _dest[0];
-            query.y = _dest[1];
-            query.z = _dest[2];
-            std::vector<int> index;
-            std::vector< float > dist;
-            octree.nearestKSearch(query, 1, index, dist);
+        if(waypoints_.size() > 0){
             
-            return dist[0] > safeDist;
-        };
-        planner.addConstraint(c1);
-        
-        Eigen::Vector3f sphereCentre = {    (minPt.x + maxPt.x)/2 ,
-                                            (minPt.y + maxPt.y)/2 ,
-                                            /*(minPt.z + maxPt.z)/2*/ 2.0 };
-        float radSphere = 10;
-        mp::Constraint c2 = [&](const Eigen::Vector3f & _old, const Eigen::Vector3f &_new){
-            return pow(_new[0] - sphereCentre[0], 2) + pow(_new[1] - sphereCentre[1], 2) + pow(_new[2] - sphereCentre[2], 2) - pow(radSphere,2) > 0;
-        };
-        planner.addConstraint(c2);
+            // Add constraint
+            pcl::octree::OctreePointCloudSearch<pcl::PointXYZRGB> octree(0.1);
+            octree.setInputCloud(cloudT2_);
+            octree.addPointsFromInputCloud();
 
-        // Draw sphere
-        std::string sSphere = "sphere" + std::to_string(contSpheres_);
-        viewer_->addSphere(pcl::PointXYZ(sphereCentre[0], sphereCentre[1], sphereCentre[2]), radSphere, sSphere);
-        ui->qvtkWidget->update();
-        contSpheres_++;
+            std::vector<mp::RRTStar::NodeInfo> nodesInfo;
+            pcl::PointCloud<pcl::PointXYZ>::Ptr nodes;
 
-        // Compute traj
-        auto traj = planner.compute();
-        std::vector<mp::RRTStar::NodeInfo> nodesInfo;
-        pcl::PointCloud<pcl::PointXYZ>::Ptr nodes;
-        planner.tree(nodes, nodesInfo);
+            vtkSmartPointer<vtkPolyData> treeBase;
+            vtkSmartPointer<vtkPoints> covisibilityNodes;
 
-        vtkSmartPointer<vtkPolyData> treeBase;
-        // Create new graph
-        treeBase = vtkSmartPointer<vtkPolyData>::New();
-        treeBase->Allocate();
-        vtkSmartPointer<vtkPoints> covisibilityNodes = vtkSmartPointer<vtkPoints>::New();
+            vtkSmartPointer<vtkPolyData> covisibilityGraph;
+            vtkSmartPointer<vtkPoints> covisibilityNodesTraj;
+            vtkSmartPointer<vtkUnsignedCharArray> covisibilityNodeColors;
 
-        // Fill-up with nodes
-        for(unsigned i = 0; i <  nodes->size(); i++){
-            covisibilityNodes->InsertNextPoint(     nodes->points[i].x, 
-                                                    nodes->points[i].y, 
-                                                    nodes->points[i].z);
-            if(i > 0){
-                vtkIdType connectivity[2];
-                connectivity[0] = nodesInfo[i].id_;
-                connectivity[1] = nodesInfo[i].parent_;
-                treeBase->InsertNextCell(VTK_LINE,2,connectivity);
+            for(unsigned i = 0; i < waypoints_.size(); i++){
+
+                // Config planner
+                mp::RRTStar planner;
+                if(i == 0){
+                    planner.initPoint({poseX_, poseY_, poseZ_});
+                    planner.dimensions( poseX_, poseY_, poseZ_,
+                                        waypoints_[i].second[0], waypoints_[i].second[1], waypoints_[i].second[2]);
+                }else{
+                    planner.initPoint({waypoints_[i-1].second[0], waypoints_[i-1].second[1], waypoints_[i-1].second[2]});
+                    planner.dimensions( waypoints_[i-1].second[0], waypoints_[i-1].second[0], waypoints_[i-1].second[0],
+                                        waypoints_[i].second[0], waypoints_[i].second[1], waypoints_[i].second[2]);
+                }
+
+                planner.targetPoint({waypoints_[i].second[0], waypoints_[i].second[1], waypoints_[i].second[2]});
+                
+                // planner.enableDebugVisualization(viz.rawViewer());
+                planner.iterations(iterations_);
+                
+                // 666 TODO: PROBLEMS WHEN HAVE TWO POINTS THAT PRODUCE COLISIONS ON THE BRIDGE
+                float safeDist = 0.5;
+                mp::Constraint c1 = [&](const Eigen::Vector3f &_orig, const Eigen::Vector3f &_dest){
+                    pcl::PointXYZRGB query;
+                    query.x = _dest[0];
+                    query.y = _dest[1];
+                    query.z = _dest[2];
+                    std::vector<int> index;
+                    std::vector< float > dist;
+                    octree.nearestKSearch(query, 1, index, dist);
+                    
+                    return dist[0] > safeDist;
+                };
+                //planner.addConstraint(c1);
+
+                // 666 TODO: CONSTRAINT C2 IS NOT WORKING!!!
+                mp::Constraint c2 = [&](const Eigen::Vector3f & _old, const Eigen::Vector3f &_new){
+                    pcl::octree::OctreePointCloudSearch<pcl::PointXYZRGB>::AlignedPointTVector intersections;
+                    octree.getIntersectedVoxelCenters({leicaX_, leicaY_, leicaZ_}, {_old[0]-leicaX_, _old[1]-leicaY_, _old[2]-leicaZ_}, intersections);
+                    
+                    return intersections.size() == 0;
+                };
+                //planner.addConstraint(c2);
+
+                // Compute traj
+                auto traj = planner.compute();
+                planner.tree(nodes, nodesInfo);
+
+                // Create new graph
+                treeBase = vtkSmartPointer<vtkPolyData>::New();
+                treeBase->Allocate();
+                covisibilityNodes = vtkSmartPointer<vtkPoints>::New();
+
+                // Fill-up with nodes
+                for(unsigned i = 0; i <  nodes->size(); i++){
+                    covisibilityNodes->InsertNextPoint(     nodes->points[i].x, 
+                                                            nodes->points[i].y, 
+                                                            nodes->points[i].z);
+                    if(i > 0){
+                        vtkIdType connectivity[2];
+                        connectivity[0] = nodesInfo[i].id_;
+                        connectivity[1] = nodesInfo[i].parent_;
+                        treeBase->InsertNextCell(VTK_LINE,2,connectivity);
+                    }
+                }
+
+                treeBase->SetPoints(covisibilityNodes);
+                viewer_->addModelFromPolyData(treeBase, "treeRRT_"+std::to_string(cont_));
+                ui->qvtkWidget->update();
+
+                // Create new graph
+                covisibilityGraph = vtkSmartPointer<vtkPolyData>::New();
+                covisibilityGraph->Allocate();
+            
+                covisibilityNodeColors = vtkSmartPointer<vtkUnsignedCharArray>::New();
+                covisibilityNodeColors->SetNumberOfComponents(3);
+                covisibilityNodeColors->SetName("Colors");
+
+                covisibilityNodesTraj = vtkSmartPointer<vtkPoints>::New();
+
+                auto points = traj.points();
+                if(useSpline_){
+                    Spline<Eigen::Vector3f, float> spl(20);
+                    spl.set_ctrl_points(points);
+                    int nPoints = points.size()*10;
+                    for(unsigned i = 0; i < nPoints; i++){
+                        auto p = spl.eval_f(1.0 / nPoints* i );
+
+                        std::vector<double> pTray = {p(0), p(1), p(2)};
+                        trayectory_.push_back(std::make_pair(idTray_, pTray));
+                        idTray_++;
+
+                        const unsigned char green[3] = {0, 255, 0};
+                        covisibilityNodesTraj->InsertNextPoint( p[0], 
+                                                                p[1], 
+                                                                p[2]);
+                        covisibilityNodeColors->InsertNextTupleValue(green);
+                        if(i > 0){
+                            vtkIdType connectivity[2];
+                            connectivity[0] = i-1;
+                            connectivity[1] = i;
+                            covisibilityGraph->InsertNextCell(VTK_LINE,2,connectivity);
+                        }
+                    }
+                }else{
+                    for(unsigned i = 0; i <  points.size(); i++){
+                        std::vector<double> pTray = {points[i][0], points[i][1], points[i][2]};
+                        trayectory_.push_back(std::make_pair(idTray_, pTray));
+                        idTray_++;
+
+                        const unsigned char green[3] = {0, 255, 0};
+                        covisibilityNodesTraj->InsertNextPoint( points[i][0], 
+                                                                points[i][1], 
+                                                                points[i][2]);
+                        covisibilityNodeColors->InsertNextTupleValue(green);
+                        if(i > 0){
+                            vtkIdType connectivity[2];
+                            connectivity[0] = i-1;
+                            connectivity[1] = i;
+                            covisibilityGraph->InsertNextCell(VTK_LINE,2,connectivity);
+                        }
+                    }            
+                }
+
+                covisibilityGraph->SetPoints(covisibilityNodesTraj);
+                covisibilityGraph->GetPointData()->SetScalars(covisibilityNodeColors);
+                viewer_->addModelFromPolyData(covisibilityGraph, "covisibility_graph_"+std::to_string(cont_));
+                cont_++;
+                ui->qvtkWidget->update();
+
             }
         }
-
-        treeBase->SetPoints(covisibilityNodes);
-        viewer_->addModelFromPolyData(treeBase, "treeRRT");
-        ui->qvtkWidget->update();
-
-        // Create new graph
-        vtkSmartPointer<vtkPolyData> covisibilityGraph = vtkSmartPointer<vtkPolyData>::New();
-        covisibilityGraph->Allocate();
-    
-        vtkSmartPointer<vtkUnsignedCharArray> covisibilityNodeColors = vtkSmartPointer<vtkUnsignedCharArray>::New();
-        covisibilityNodeColors->SetNumberOfComponents(3);
-        covisibilityNodeColors->SetName("Colors");
-
-        vtkSmartPointer<vtkPoints> covisibilityNodesTraj = vtkSmartPointer<vtkPoints>::New();
-
-        // Fill-up with nodes
-        auto points = traj.points();
-        for(unsigned i = 0; i <  points.size(); i++){
-            const unsigned char green[3] = {0, 255, 0};
-            covisibilityNodesTraj->InsertNextPoint(    points[i][0], 
-                                                    points[i][1], 
-                                                    points[i][2]);
-            covisibilityNodeColors->InsertNextTupleValue(green);
-            if(i > 0){
-                vtkIdType connectivity[2];
-                connectivity[0] = i-1;
-                connectivity[1] = i;
-                covisibilityGraph->InsertNextCell(VTK_LINE,2,connectivity);
-            }
-        }
-
-        covisibilityGraph->SetPoints(covisibilityNodesTraj);
-        covisibilityGraph->GetPointData()->SetScalars(covisibilityNodeColors);
-        viewer_->addModelFromPolyData(covisibilityGraph, "covisibility_graph_"+std::to_string(contSpheres_));
-        ui->qvtkWidget->update();
-
     }
 
 }
@@ -298,14 +333,15 @@ void PCLViewer_gui::run_generateTray(){
 //---------------------------------------------------------------------------------------------------------------------
 void PCLViewer_gui::run_sendMision(){
 
-    for(unsigned i = 0; i < waypoints_.size(); i++){
-        pose msg;
-        msg.x = waypoints_[i].second[0];
-        msg.y = waypoints_[i].second[1];
-        msg.z = waypoints_[i].second[2];
-        pubWP_->publish(msg);
-        std::this_thread::sleep_for(std::chrono::milliseconds(100)); 
-    }
+    //for(unsigned i = 0; i < waypoints_.size(); i++){
+    //    pose msg;
+    //    msg.x = waypoints_[i].second[0];
+    //    msg.y = waypoints_[i].second[1];
+    //    msg.z = waypoints_[i].second[2];
+    //    pubWP_->publish(msg);
+    //    std::this_thread::sleep_for(std::chrono::milliseconds(100)); 
+    //}
+
 
 }
 
@@ -510,7 +546,7 @@ void PCLViewer_gui::updateObjectUAV(){
     q.x() = poseOX_;
     q.y() = poseOY_;
     q.z() = poseOZ_;
-    q.w() = poseOw_;    
+    q.w() = poseOW_;    
     Eigen::Matrix3f R = q.normalized().toRotationMatrix();
 
     Eigen::Matrix4f pose = Eigen::Matrix4f::Identity();

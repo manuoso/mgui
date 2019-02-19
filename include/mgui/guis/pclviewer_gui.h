@@ -51,6 +51,7 @@
 #include <fastcom/Publisher.h>
 
 #include <motion_planning/planners/rrtstar.h>
+#include <motion_planning/utils/splines.hpp>
 
 typedef pcl::PointXYZ PointT1;
 typedef pcl::PointCloud<PointT1> PointCloudT1;
@@ -163,11 +164,19 @@ private:
 
     rapidjson::Document configFile_;
 
+    int iterations_ = 0;
     int contSpheres_ = 0;
+    int cont_ = 0;
     bool endSub_ = false;
+    bool useSpline_ = false;
 
     std::vector<std::pair<int, std::vector<double>>> waypoints_;
-    float poseX_ = 0.0, poseY_ = 0.0, poseZ_ = 0.0, poseOX_ = 0.0, poseOY_ = 0.0, poseOZ_ = 0.0, poseOw_ = 1.0;
+
+    int idTray_ = 0;
+    std::vector<std::pair<int, std::vector<double>>> trayectory_;
+    
+    float poseX_ = 0.0, poseY_ = 0.0, poseZ_ = 0.0, poseOX_ = 0.0, poseOY_ = 0.0, poseOZ_ = 0.0, poseOW_ = 1.0;
+    float leicaX_ = 0.0, leicaY_ = 0.0, leicaZ_ = 0.0;
 
     std::mutex objectLock_;
 

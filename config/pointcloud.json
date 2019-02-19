@@ -1,6 +1,5 @@
 {	
 	"save_pcd_ply":false,
-
 	"use_ply":false,
 	"dir_ply":"/home/polux/programming/catkin_mgui/src/mgui/bridges/Bridge_Algodonales.ply",
 	"use_pcd":true,
@@ -8,6 +7,11 @@
 	"use_txt":false,
 	"dir_txt":"/home/polux/programming/catkin_mgui/src/mgui/bridges/AlgodonalesAerob.pts",
 	"type_point":"PointXYZRGB",
+	"leica_init_x":0.0,
+	"leica_init_y":0.0,
+	"leica_init_z":0.0,
+	"iterations_traj":20000,
+	"use_spline":true,
 	"type_callback":"fastcom",
 	"callback_name":"",
 	"callback_ip":"0.0.0.0",
