@@ -445,7 +445,7 @@ bool PCLViewer_gui::extractPointCloud(std::string _dir)
 {   
     // Set up the QVTK window
     viewer_.reset(new pcl::visualization::PCLVisualizer("viewer", false));
-    viewer_->setBackgroundColor(153, 153, 153);
+    viewer_->setBackgroundColor(0.6, 0.6, 0.6);
     ui->qvtkWidget->SetRenderWindow(viewer_->getRenderWindow());
     viewer_->setupInteractor(ui->qvtkWidget->GetInteractor(), ui->qvtkWidget->GetRenderWindow());
     ui->qvtkWidget->update();
