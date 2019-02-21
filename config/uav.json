@@ -1,6 +1,7 @@
 {	
-	"ip_sender":"0.0.0.0",
-	"ip_receiver":"0.0.0.0",
+	"ip_sender":"10.0.0.66",
+	"ip_sender_wp":"0.0.0.0",
+	"ip_receiver":"10.0.0.15",
 	"portCommand":8000,
 	"portState":8001,
 	"portPose":8002,

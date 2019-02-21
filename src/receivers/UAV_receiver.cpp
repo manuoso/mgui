@@ -74,14 +74,18 @@ bool UAV_receiver::init(int _argc, char**_argv) {
             state_ = eState::LAND;
         }else if(_data.type == 4){
             state_ = eState::MOVE;
+            secureLock_.lock();
             x_ = _data.x;
             y_ = _data.y;
             z_ = _data.z;
+            secureLock_.unlock();
         }else if(_data.type == 5){
             state_ = eState::MOVE_VEL;
+            secureLock_.lock();
             x_ = _data.x;
             y_ = _data.y;
             z_ = _data.z;
+            secureLock_.unlock();
         }else if(_data.type == 6){
             state_ = eState::EXIT;
         }else{
@@ -180,6 +184,7 @@ bool UAV_receiver::run() {
             }
             case eState::MOVE:
             {   
+                secureLock_.lock();
                 grvc::ual::Waypoint waypoint;
                 waypoint.header.frame_id = "map";
                 waypoint.pose.position.x = x_;
@@ -189,7 +194,9 @@ bool UAV_receiver::run() {
                 waypoint.pose.orientation.y = 0;
                 waypoint.pose.orientation.z = 0;
                 waypoint.pose.orientation.w = 1;
+                secureLock_.unlock();
                 ual_->goToWaypoint(waypoint);
+                std::this_thread::sleep_for(std::chrono::milliseconds(1000)); 
                 int check = 1;
                 pubCheck_->publish(check);
                 state_ = eState::WAIT;
@@ -198,10 +205,12 @@ bool UAV_receiver::run() {
             case eState::MOVE_VEL:
             {   
                 grvc::ual::Velocity velocity;
+                secureLock_.lock();
                 velocity.header.frame_id = "map";
                 velocity.twist.linear.x = x_;
                 velocity.twist.linear.y = y_;
                 velocity.twist.linear.z = z_;
+                secureLock_.unlock();
                 ual_->setVelocity(velocity);
                 state_ = eState::WAIT;
                 break;
@@ -219,5 +228,5 @@ bool UAV_receiver::run() {
         }   
     }
 
-    return true;
+    return false;
 }

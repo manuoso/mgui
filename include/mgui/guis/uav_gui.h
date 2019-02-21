@@ -97,10 +97,10 @@ class UAV_gui : public QMainWindow {
             void land();   
 
             /// Slot that run get velocity of the UAV
-            void run_getVel();
+            void run_getVelo();
 
             /// Slot that stop the thread of take velocity of the UAV
-            void stop_getVel();
+            void stop_getVelo();
             
             /// Slot that run get local position of the UAV
             void run_localPose();
@@ -121,13 +121,13 @@ class UAV_gui : public QMainWindow {
             void stop_velocity();
 
             /// Slot that send a list of waypoints to go the UAV
-            void run_waypoints();
+            void run_wayPoints();
 
             /// Slot that delete a desired waypoint of a list of waypoints
             void delete_waypoints();
 
             /// Slot that send a message of emergency to finish all in the UAV
-            void emergency();
+            void emergencyStop();
 
         private:
             /// Method that update local position of the UAV
@@ -159,7 +159,7 @@ class UAV_gui : public QMainWindow {
             fastcom::Subscriber<pose> *subsWP_ = nullptr;
 
             std::thread *velocityThread_, *localPoseThread_, *getVelThread_;
-            std::mutex objectLock_;
+            std::mutex objectLockPose_, objectLockVel_, objectLockState_, objectLock_;
             
             std::chrono::time_point<std::chrono::high_resolution_clock> lastTimePose_, lastTimeVel_, lastTimeSendVel_;	
             std::vector<std::pair<int, std::vector<double>>> waypoints_;
@@ -171,7 +171,7 @@ class UAV_gui : public QMainWindow {
             bool printLocalPose_ = false;
             bool printVel_ = false;
             bool sendVelocity_ = false;
-            bool sendNextWP = false;
+            bool sendNextWP_ = false;
 };
 
 #endif // GUIS_UAV_GUI_H

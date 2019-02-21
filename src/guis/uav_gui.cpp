@@ -36,8 +36,8 @@ UAV_gui::UAV_gui(QWidget *parent) :
     connect(ui->takeOff, SIGNAL(clicked()), this, SLOT(takeOff()));
     connect(ui->land, SIGNAL(clicked()), this, SLOT(land()));
 
-    connect(ui->Run_getVel, SIGNAL(clicked()), this, SLOT(run_getVel()));
-    connect(ui->Stop_getVel, SIGNAL(clicked()), this, SLOT(stop_getVel()));
+    connect(ui->Run_getVel, SIGNAL(clicked()), this, SLOT(run_getVelo()));
+    connect(ui->Stop_getVel, SIGNAL(clicked()), this, SLOT(stop_getVelo()));
 
     connect(ui->Run_pose, SIGNAL(clicked()), this, SLOT(run_localPose()));
     connect(ui->Stop_pose, SIGNAL(clicked()), this, SLOT(stop_localPose()));
@@ -48,10 +48,10 @@ UAV_gui::UAV_gui(QWidget *parent) :
     connect(ui->Run_vel, SIGNAL(clicked()), this, SLOT(run_velocity()));
     connect(ui->Stop_vel, SIGNAL(clicked()), this, SLOT(stop_velocity()));
 
-    connect(ui->Run_waypoints, SIGNAL(clicked()), this, SLOT(run_waypoints()));
+    connect(ui->Run_waypoints, SIGNAL(clicked()), this, SLOT(run_wayPoints()));
     connect(ui->DeleteWP, SIGNAL(clicked()), this, SLOT(delete_waypoints()));
 
-    connect(ui->Emergency, SIGNAL(clicked()), this, SLOT(emergency()));
+    connect(ui->Emergency, SIGNAL(clicked()), this, SLOT(emergencyStop()));
 
     connect(this, &UAV_gui::localPositionChanged , this, &UAV_gui::updateLocalPose);
     connect(this, &UAV_gui::stateChanged , this, &UAV_gui::updateState);
@@ -111,6 +111,7 @@ bool UAV_gui::configureGUI(int _argc, char **_argv){
     }
 
     std::string ip = configFile_["ip_sender"].GetString();
+    std::string ipWP = configFile_["ip_sender_wp"].GetString();
     int portCommand = configFile_["portCommand"].GetInt();
     int portState = configFile_["portState"].GetInt();
     int portPose = configFile_["portPose"].GetInt();
@@ -124,15 +125,15 @@ bool UAV_gui::configureGUI(int _argc, char **_argv){
     subsPose_ = new fastcom::Subscriber<pose>(ip, portPose);
     subsVel_ = new fastcom::Subscriber<pose>(ip, portVel);
     subsCheck_ = new fastcom::Subscriber<int>(ip, portCheck);
-    subsWP_ = new fastcom::Subscriber<pose>(ip, portWP);
+    subsWP_ = new fastcom::Subscriber<pose>(ipWP, portWP);
 
     // Callback of received commands
     subsState_->attachCallback([&](const int &_data){
         int cpy;
-        bool dataChanged;
-        objectLock_.lock();
+        bool dataChanged = false;
+        objectLockState_.lock();
         cpy = _data;
-        objectLock_.unlock();
+        objectLockState_.unlock();
         if(cpy == 1){
             stateUAV_ = "WAIT";
             dataChanged = true;
@@ -158,53 +159,53 @@ bool UAV_gui::configureGUI(int _argc, char **_argv){
         }
 
         if(dataChanged){
-            dataChanged = false;
             emit stateChanged(); 
         }     
     });
 
     // Callback of received pose
     subsPose_->attachCallback([&](const pose &_data){
-        objectLock_.lock();
+        objectLockPose_.lock();
         poseUAV_.x = _data.x;
         poseUAV_.y = _data.y;
         poseUAV_.z = _data.z;
-        objectLock_.unlock();
+        objectLockPose_.unlock();
     });
     
     // Callback of received velocity
     subsVel_->attachCallback([&](const pose &_data){
-        objectLock_.lock();
+        objectLockVel_.lock();
         velUAV_.x = _data.x;
         velUAV_.y = _data.y;
         velUAV_.z = _data.z;
-        objectLock_.unlock();
+        objectLockVel_.unlock();
     });
 
     // Callback of received check
     subsCheck_->attachCallback([&](const int &_data){
         if(_data == 1){
-            sendNextWP = true;
+            sendNextWP_ = true;
         }else{
             std::cout << "Received unrecognized check" << std::endl;
-            sendNextWP = false;
+            sendNextWP_ = false;
         }
     });
 
     // Callback of received waypoints
     subsWP_->attachCallback([&](const pose &_data){
-        objectLock_.lock();
+	    std::cout << "Received WP" << std::endl;
         float x = _data.x;
         float y = _data.y;
         float z = _data.z;
-        objectLock_.unlock();
 
-        int id = idWP_;
-        idWP_++;
-        std::vector<double> point = {x, y, z};
-        waypoints_.push_back(std::make_pair(id, point));
+        if((x != 0) && (y != 0) && (z != 0)){
+            int id = idWP_;
+            idWP_++;
+            std::vector<double> point = {x, y, z};
+            waypoints_.push_back(std::make_pair(id, point));
 
-        emit listWPChanged();
+            emit listWPChanged();
+        }
     });
 
     lastTimePose_ = std::chrono::high_resolution_clock::now();
@@ -246,15 +247,15 @@ void UAV_gui::land(){
 }
 
 //---------------------------------------------------------------------------------------------------------------------
-void UAV_gui::run_getVel(){
+void UAV_gui::run_getVelo(){
 
     printVel_ = true;
     getVelThread_ = new std::thread([&]{
         while(printVel_){
             auto t1 = std::chrono::high_resolution_clock::now();
             if(std::chrono::duration_cast<std::chrono::milliseconds>(t1 - lastTimeVel_).count() > 50){
-                emit velChanged(); 
                 lastTimeVel_ = t1;
+                emit velChanged(); 
             }		
         }
     });
@@ -265,7 +266,7 @@ void UAV_gui::run_getVel(){
 }
 
 //---------------------------------------------------------------------------------------------------------------------
-void UAV_gui::stop_getVel(){
+void UAV_gui::stop_getVelo(){
 
     printVel_ = false;
     getVelThread_->join();
@@ -283,8 +284,8 @@ void UAV_gui::run_localPose(){
         while(printLocalPose_){
             auto t1 = std::chrono::high_resolution_clock::now();
             if(std::chrono::duration_cast<std::chrono::milliseconds>(t1 - lastTimePose_).count() > 50){
-                emit localPositionChanged(); 
                 lastTimePose_ = t1;
+                emit localPositionChanged(); 
             }
         }
     });
@@ -382,8 +383,8 @@ void UAV_gui::run_velocity(){
             msg.z = sendVelUAV_.z;
             auto t1 = std::chrono::high_resolution_clock::now();
      		if(std::chrono::duration_cast<std::chrono::milliseconds>(t1 - lastTimeSendVel_).count() > 50){
+                 lastTimeSendVel_ = t1;
         		pubCommand_->publish(msg);
-                lastTimeSendVel_ = t1;
     		}
         }
     });
@@ -405,10 +406,12 @@ void UAV_gui::stop_velocity(){
 }
 
 //---------------------------------------------------------------------------------------------------------------------
-void UAV_gui::run_waypoints(){
+void UAV_gui::run_wayPoints(){
 
-    sendNextWP = false;
-    for(unsigned i = 0; i < waypoints_.size(); i++){
+    sendNextWP_ = false;
+
+    for(int i = waypoints_.size()-1 ; i > -1; i--){ // SE LEEN AL REVES! BE CAREFULLY 
+    //for(int i = 0 ; i < waypoints_.size(); i++){
         command msg;
         msg.type = 4;
         msg.x = waypoints_[i].second[0];
@@ -419,10 +422,10 @@ void UAV_gui::run_waypoints(){
         }else{
             std::cout << "Cant send position while you are sending velocity" << std::endl;
         }
-        while(!sendNextWP){
+        while(!sendNextWP_){
             std::this_thread::sleep_for(std::chrono::milliseconds(100)); 
         }
-        sendNextWP = false;
+        sendNextWP_ = false;
     }
 
 }
@@ -440,7 +443,7 @@ void UAV_gui::delete_waypoints(){
 }
 
 //---------------------------------------------------------------------------------------------------------------------
-void UAV_gui::emergency(){
+void UAV_gui::emergencyStop(){
 
     command msg;
     msg.type = 6;
@@ -455,38 +458,38 @@ void UAV_gui::emergency(){
 
 //---------------------------------------------------------------------------------------------------------------------
 void UAV_gui::updateLocalPose(){
-    objectLock_.lock();
+    objectLockPose_.lock();
     ui->lineEdit_j1->setText(QString::number(poseUAV_.x));
     ui->lineEdit_j2->setText(QString::number(poseUAV_.y));
     ui->lineEdit_j3->setText(QString::number(poseUAV_.z));
-    objectLock_.unlock();
+    objectLockPose_.unlock();
 }
 
 //---------------------------------------------------------------------------------------------------------------------
 void UAV_gui::updateVel(){
-    objectLock_.lock();
+    objectLockVel_.lock();
     ui->lineEdit_v1->setText(QString::number(velUAV_.x));
     ui->lineEdit_v2->setText(QString::number(velUAV_.y));
     ui->lineEdit_v3->setText(QString::number(velUAV_.z));
-    objectLock_.unlock();
+    objectLockVel_.unlock();
 }
 
 //---------------------------------------------------------------------------------------------------------------------
 void UAV_gui::updateState(){
-    objectLock_.lock();
+    objectLockState_.lock();
     ui->lineEdit_M->setText(QString::fromStdString(stateUAV_));
-    objectLock_.unlock();
+    objectLockState_.unlock();
 }
 
 //---------------------------------------------------------------------------------------------------------------------
 void UAV_gui::updateListWP(){
-    objectLock_.lock();
+    //objectLock_.lock();
     int id = idWP_-1;
     float x = waypoints_[id].second[0];
     float y = waypoints_[id].second[1];
     float z = waypoints_[id].second[2];
     std::string swaypoint = "ID: " + std::to_string(id) + " , " + "X: " + std::to_string(x) + " , " +  "Y: " + std::to_string(y) + " , " + "Z: " + std::to_string(z);
     ui->listWidget_WayPoints->addItem(QString::fromStdString(swaypoint));
-    objectLock_.unlock();
+    //objectLock_.unlock();
 }
 

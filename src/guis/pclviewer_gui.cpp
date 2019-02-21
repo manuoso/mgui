@@ -136,10 +136,12 @@ bool PCLViewer_gui::configureGUI(int _argc, char **_argv)
         poseZ_ = _data.z;
         objectLock_.unlock();
 
-        auto t1 = std::chrono::high_resolution_clock::now();
-        if(std::chrono::duration_cast<std::chrono::milliseconds>(t1 - lastTimePose_).count() > 50){
-            emit poseUAVchanged(); 
-            lastTimePose_ = t1;
+        if(pathModelPose_ != ""){
+            auto t1 = std::chrono::high_resolution_clock::now();
+            if(std::chrono::duration_cast<std::chrono::milliseconds>(t1 - lastTimePose_).count() > 100){
+                lastTimePose_ = t1;
+                emit poseUAVchanged(); 
+            }
         }
     });
     
@@ -418,6 +420,31 @@ void PCLViewer_gui::run_sendMision(){
     //    std::this_thread::sleep_for(std::chrono::milliseconds(100)); 
     //}
 
+    int size = trayectory_.size();
+    int pIni = size/3;
+    int pInt = size/2;
+    int pFinal = size/3 + pInt;  
+
+    pose msgIni;
+    msgIni.x = trayectory_[pIni].second[0];
+    msgIni.y = trayectory_[pIni].second[1];
+    msgIni.z = trayectory_[pIni].second[2];
+    //pubWP_->publish(msgIni);
+    //std::this_thread::sleep_for(std::chrono::milliseconds(100)); 
+
+    pose msgInt;
+    msgInt.x = trayectory_[pInt].second[0];
+    msgInt.y = trayectory_[pInt].second[1];
+    msgInt.z = trayectory_[pInt].second[2];
+    pubWP_->publish(msgInt);
+    std::this_thread::sleep_for(std::chrono::milliseconds(100)); 
+
+    pose msgFin;
+    msgFin.x = trayectory_[pFinal].second[0];
+    msgFin.y = trayectory_[pFinal].second[1];
+    msgFin.z = trayectory_[pFinal].second[2];
+    pubWP_->publish(msgFin);
+    std::this_thread::sleep_for(std::chrono::milliseconds(100)); 
 
 }
 
@@ -503,7 +530,7 @@ bool PCLViewer_gui::extractPointCloud(std::string _dir)
     viewer_->resetCamera();
     viewer_->registerPointPickingCallback(&PCLViewer_gui::pointPickingOccurred, *this);
 
-    if(nameCallbackPose_ != ""){
+    if(pathModelPose_ != ""){
         if(typeModelPose_ == "OBJ"){
             pcl::io::loadPolygonFileOBJ(pathModelPose_, untransformedUav_);
         }else if(typeModelPose_ == "STL" ){
@@ -513,9 +540,13 @@ bool PCLViewer_gui::extractPointCloud(std::string _dir)
             return false;
         }
         
-        viewer_->addPolygonMesh(untransformedUav_, "uav_pose");
+        //viewer_->addPolygonMesh(untransformedUav_, "uav_pose");
+
+        PointCloudT1::Ptr cloudUAV;
+        cloudUAV.reset (new PointCloudT1);
+        pcl::fromPCLPointCloud2(untransformedUav_.cloud, *cloudUAV);
+        viewer_->addPointCloud(cloudUAV, "uav_pose");
         ui->qvtkWidget->update();
-    
 
     }
 
@@ -643,14 +674,16 @@ void PCLViewer_gui::updateObjectUAV(){
 
     Eigen::Affine3f transform(pose);
 
-    pcl::PolygonMesh meshUav = untransformedUav_;
+    viewer_->updatePointCloudPose("uav_pose", transform);
 
-    PointCloudT1 pointCloud;
-    pcl::fromPCLPointCloud2(meshUav.cloud, pointCloud);
-    
-    pcl::transformPointCloud(pointCloud, pointCloud, transform);
+    //pcl::PolygonMesh meshUav = untransformedUav_;
+
+    //PointCloudT1 pointCloud;
+    //pcl::fromPCLPointCloud2(meshUav.cloud, pointCloud);
+
+    //pcl::transformPointCloud(pointCloud, pointCloud, transform);
         
-    pcl::toPCLPointCloud2(pointCloud, meshUav.cloud);
+    //pcl::toPCLPointCloud2(pointCloud, meshUav.cloud);
 
     // if(typePoint_ == "PointXYZ"){
     //     PointCloudT1 pointCloud;
@@ -668,7 +701,7 @@ void PCLViewer_gui::updateObjectUAV(){
     //     pcl::toPCLPointCloud2(pointCloud, meshUav.cloud);
     // }
     
-    viewer_->updatePolygonMesh(meshUav, "uav_pose");
+    //viewer_->updatePolygonMesh(meshUav, "uav_pose");
     ui->qvtkWidget->update();
 
 }
