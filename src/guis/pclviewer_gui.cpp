@@ -186,7 +186,15 @@ void PCLViewer_gui::run_generateTray(){
         std::cout << "Not implemented YET" << std::endl;
 
     }else if(typePoint_ == "PointXYZRGB"){
-        
+        // Remove previous trayectories if exists
+        int oldCont = 0;
+        while(oldCont<=cont_ ){
+            viewer_->removeShape("traj_"+std::to_string(oldCont));
+            ui->qvtkWidget->update();
+            oldCont++;
+        }
+        cont_ = 0;
+
         std::random_device rd{};
         std::mt19937 gen{rd()};
 
@@ -398,7 +406,7 @@ void PCLViewer_gui::run_generateTray(){
 
                 covisibilityGraph->SetPoints(covisibilityNodesTraj);
                 covisibilityGraph->GetPointData()->SetScalars(covisibilityNodeColors);
-                viewer_->addModelFromPolyData(covisibilityGraph, "covisibility_graph_"+std::to_string(cont_));
+                viewer_->addModelFromPolyData(covisibilityGraph, "traj_"+std::to_string(cont_));
                 cont_++;
                 ui->qvtkWidget->update();
 
