@@ -53,6 +53,8 @@
 #include <motion_planning/planners/rrtstar.h>
 #include <motion_planning/utils/splines.hpp>
 
+#include <mgui/LogTray.h>
+
 typedef pcl::PointXYZ PointT1;
 typedef pcl::PointCloud<PointT1> PointCloudT1;
 

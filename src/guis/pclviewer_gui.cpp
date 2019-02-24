@@ -145,6 +145,8 @@ bool PCLViewer_gui::configureGUI(int _argc, char **_argv)
         }
     });
     
+    LogTray::init("Trajectory_" + std::to_string(time(NULL)));
+
     return true;
 }
 
@@ -285,6 +287,10 @@ void PCLViewer_gui::run_generateTray(){
                                                 ), radSphere, 0, 1, 0, sSphere);
                 ui->qvtkWidget->update();
                 contSpheres_++;
+
+                std::vector<double> pTray = {newTarget[0], newTarget[1], newTarget[2]};
+                trayectory_.push_back(std::make_pair(idTray_, pTray));
+                idTray_++;
             }
 
             for(unsigned i = 0; i < targetPoints.size(); i++){
@@ -368,9 +374,12 @@ void PCLViewer_gui::run_generateTray(){
                     for(unsigned i = 0; i < nPoints; i++){
                         auto p = spl.eval_f(1.0 / nPoints* i );
 
-                        std::vector<double> pTray = {p(0), p(1), p(2)};
-                        trayectory_.push_back(std::make_pair(idTray_, pTray));
-                        idTray_++;
+                        //std::vector<double> pTray = {p[0], p[1], p[2]};
+                        //trayectory_.push_back(std::make_pair(idTray_, pTray));
+                        //idTray_++;
+
+                        std::string stringTray = std::to_string(p[0]) + " " + std::to_string(p[1]) + " " + std::to_string(p[2]);
+                        LogTray::get()->message(stringTray, false);
 
                         const unsigned char green[3] = {0, 255, 0};
                         covisibilityNodesTraj->InsertNextPoint( p[0], 
@@ -386,9 +395,12 @@ void PCLViewer_gui::run_generateTray(){
                     }
                 }else{
                     for(unsigned i = 0; i <  points.size(); i++){
-                        std::vector<double> pTray = {points[i][0], points[i][1], points[i][2]};
-                        trayectory_.push_back(std::make_pair(idTray_, pTray));
-                        idTray_++;
+                        //std::vector<double> pTray = {points[i][0], points[i][1], points[i][2]};
+                        //trayectory_.push_back(std::make_pair(idTray_, pTray));
+                        //idTray_++;
+
+                        std::string stringTray = std::to_string(points[i][0]) + " " + std::to_string(points[i][1]) + " " + std::to_string(points[i][2]);
+                        LogTray::get()->message(stringTray, false);
 
                         const unsigned char green[3] = {0, 255, 0};
                         covisibilityNodesTraj->InsertNextPoint( points[i][0], 
@@ -419,39 +431,41 @@ void PCLViewer_gui::run_generateTray(){
 //---------------------------------------------------------------------------------------------------------------------
 void PCLViewer_gui::run_sendMision(){
 
-    //for(unsigned i = 0; i < waypoints_.size(); i++){
-    //    pose msg;
-    //    msg.x = waypoints_[i].second[0];
-    //    msg.y = waypoints_[i].second[1];
-    //    msg.z = waypoints_[i].second[2];
-    //    pubWP_->publish(msg);
-    //    std::this_thread::sleep_for(std::chrono::milliseconds(100)); 
-    //}
+    for(unsigned i = 0; i < trayectory_.size(); i++){
+        pose msg;
+        msg.x = trayectory_[i].second[0];
+        msg.y = trayectory_[i].second[1];
+        msg.z = trayectory_[i].second[2];
+        pubWP_->publish(msg);
+        std::this_thread::sleep_for(std::chrono::milliseconds(100)); 
+    }
 
-    int size = trayectory_.size();
-    int pIni = size/3;
-    int pInt = size/2;
-    int pFinal = size/3 + pInt;  
+    // 666 TODO: NOT WORKING GET POINTS TRAYECTORY
 
-    pose msgIni;
-    msgIni.x = trayectory_[pIni].second[0];
-    msgIni.y = trayectory_[pIni].second[1];
-    msgIni.z = trayectory_[pIni].second[2];
-    //pubWP_->publish(msgIni);
+    //int size = trayectory_.size();
+    //int pIni = size/3;
+    //int pInt = size/2;
+    //int pFinal = size-1;  
+
+    //pose msgInt;
+    //msgInt.x = trayectory_[pInt].second[0];
+    //msgInt.y = trayectory_[pInt].second[1];
+    //msgInt.z = trayectory_[pInt].second[2];
+    //pubWP_->publish(msgInt);
     //std::this_thread::sleep_for(std::chrono::milliseconds(100)); 
 
-    pose msgInt;
-    msgInt.x = trayectory_[pInt].second[0];
-    msgInt.y = trayectory_[pInt].second[1];
-    msgInt.z = trayectory_[pInt].second[2];
-    pubWP_->publish(msgInt);
-    std::this_thread::sleep_for(std::chrono::milliseconds(100)); 
+    //pose msgFin;
+    //msgFin.x = trayectory_[pFinal].second[0];
+    //msgFin.y = trayectory_[pFinal].second[1];
+    //msgFin.z = trayectory_[pFinal].second[2];
+    //pubWP_->publish(msgFin);
+    //std::this_thread::sleep_for(std::chrono::milliseconds(100)); 
 
-    pose msgFin;
-    msgFin.x = trayectory_[pFinal].second[0];
-    msgFin.y = trayectory_[pFinal].second[1];
-    msgFin.z = trayectory_[pFinal].second[2];
-    pubWP_->publish(msgFin);
+    pose msgFinalLand;
+    msgFinalLand.x = poseX_;
+    msgFinalLand.y = poseY_;
+    msgFinalLand.z = poseZ_ + 1.5;
+    pubWP_->publish(msgFinalLand);
     std::this_thread::sleep_for(std::chrono::milliseconds(100)); 
 
 }
@@ -462,7 +476,7 @@ void PCLViewer_gui::deleteSphere(){
     QList<QListWidgetItem*> items = ui->listWidget_WayPoints->selectedItems();
     foreach(QListWidgetItem * item, items){
         int index = ui->listWidget_WayPoints->row(item);
-        waypoints_.erase(waypoints_.begin() + index);
+        //waypoints_.erase(waypoints_.begin() + index); // TODO 666: NOT WORKING
         delete ui->listWidget_WayPoints->takeItem(ui->listWidget_WayPoints->row(item));
         std::string removeSphere = "sphere" + std::to_string(index);
         viewer_->removeShape(removeSphere);

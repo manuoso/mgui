@@ -410,8 +410,8 @@ void UAV_gui::run_wayPoints(){
 
     sendNextWP_ = false;
 
-    for(int i = waypoints_.size()-1 ; i > -1; i--){ // SE LEEN AL REVES! BE CAREFULLY 
-    //for(int i = 0 ; i < waypoints_.size(); i++){
+   // for(int i = waypoints_.size()-1 ; i > -1; i--){ // SE LEEN AL REVES! BE CAREFULLY 
+    for(int i = 0 ; i < waypoints_.size(); i++){
         command msg;
         msg.type = 4;
         msg.x = waypoints_[i].second[0];
