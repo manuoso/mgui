@@ -416,9 +416,11 @@ void PCLViewer_gui::run_generateTray(){
                     }            
                 }
 
+                //std::cout << "Drawing traj " << cont_ << std::endl;
                 covisibilityGraph->SetPoints(covisibilityNodesTraj);
                 covisibilityGraph->GetPointData()->SetScalars(covisibilityNodeColors);
                 viewer_->addModelFromPolyData(covisibilityGraph, "traj_"+std::to_string(cont_));
+                viewer_->setShapeRenderingProperties(pcl::visualization::PCL_VISUALIZER_LINE_WIDTH, 5, "traj_"+std::to_string(cont_));
                 cont_++;
                 ui->qvtkWidget->update();
 
