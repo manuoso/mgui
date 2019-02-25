@@ -77,7 +77,8 @@ bool PCLViewer_gui::configureGUI(int _argc, char **_argv)
     convertAndSave_ = configFile_["save_pcd_ply"].GetBool();
     drawTrajectory_ = configFile_["draw_complete_tree"].GetBool();
     safeDistance_ = configFile_["safe_distance"].GetDouble();
-
+    appPointDistance_ = configFile_["app_point_distance"].GetDouble();
+    
     usePCD_ = configFile_["use_pcd"].GetBool();
     dirPCD_ = configFile_["dir_pcd"].GetString();
 
@@ -254,16 +255,16 @@ void PCLViewer_gui::run_generateTray(){
 
 
                 Eigen::Vector3f newTarget = {
-                    p.x + plane_parameters[0]*safeDistance_*1.1,
-                    p.y + plane_parameters[1]*safeDistance_*1.1,
-                    p.z + plane_parameters[2]*safeDistance_*1.1
+                    p.x + plane_parameters[0]*appPointDistance_*1.1,
+                    p.y + plane_parameters[1]*appPointDistance_*1.1,
+                    p.z + plane_parameters[2]*appPointDistance_*1.1
                 };
 
                 if(!c2(newTarget, newTarget) || !c1(newTarget, newTarget)){
                     newTarget = {
-                        p.x - plane_parameters[0]*safeDistance_*1.1,
-                        p.y - plane_parameters[1]*safeDistance_*1.1,
-                        p.z - plane_parameters[2]*safeDistance_*1.1
+                        p.x - plane_parameters[0]*appPointDistance_*1.1,
+                        p.y - plane_parameters[1]*appPointDistance_*1.1,
+                        p.z - plane_parameters[2]*appPointDistance_*1.1
                     };
                 }
 

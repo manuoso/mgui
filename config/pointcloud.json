@@ -13,6 +13,7 @@
 	"iterations_traj":20000,
 	"draw_complete_tree":false,
 	"safe_distance":2.0,
+	"app_point_distance":0.5,
 	"use_spline":true,
 	"type_callback":"fastcom",
 	"callback_name":"",
