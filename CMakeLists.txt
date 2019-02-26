@@ -41,6 +41,13 @@ set(BUILD_TOOLS ON)
 set(USE_CATKIN ON)
 
 #########################################
+######   Check for communications  ######
+#########################################
+if(${USE_FASTCOM} AND ${USE_ROS} STREQUAL "TRUE")
+	MESSAGE( FATAL_ERROR "Couldnt use FASTCOM AND ROS in communications!")
+endif()
+
+#########################################
 ###### Loading 3rd party libraries ######
 #########################################
 
@@ -116,39 +123,43 @@ if(${USE_GUI})
 	set(CMAKE_INCLUDE_CURRENT_DIR ON)
 	set(CMAKE_AUTOMOC ON)
 	set(CMAKE_AUTOUIC ON)
-	# set(CMAKE_AUTORCC ON)
-
-	# set(SOURCES_QT
-	# 	src/guis/uav_gui.cpp
-	# 	src/guis/pclviewer_gui.cpp
-	# )
-
-	# set(HEADERS_QT
-	# 	include/mgui/guis/uav_gui.h
-	# 	include/mgui/guis/pclviewer_gui.h
-	# )
-
-	# set(UI_SOURCES_QT
-	# 	include/mgui/guis/uav_gui.ui
-	# 	include/mgui/guis/pclviewer_gui.ui
-	# )
-
-	# QT5_WRAP_CPP(MOC_SRCS ${HEADERS_QT})
-	# QT5_WRAP_UI(UI_HEADERS ${UI_SOURCES_QT})	
 endif()
 
 #########################################
 # catking
-if(${USE_CATKIN})
-	find_package(catkin REQUIRED roscpp uav_abstraction_layer)
+if(${USE_CATKIN} AND ${USE_ROS} STREQUAL "TRUE")
+	find_package(catkin REQUIRED roscpp uav_abstraction_layer )
 	if(${catkin_FOUND})
 		catkin_package(
 			CATKIN_DEPENDS roscpp uav_abstraction_layer
 			INCLUDE_DIRS include
 		)
-		list(APPEND MGUI_DEFINITIONS "MGUI_USE_ROS")
+		list(APPEND MGUI_DEFINITIONS "MGUI_USE_CATKIN_ROS")
 	endif(${catkin_FOUND})
-endif(${USE_CATKIN})
+else()
+	if(${USE_CATKIN})
+		find_package(catkin REQUIRED roscpp uav_abstraction_layer)
+		if(${catkin_FOUND})
+			catkin_package(
+				CATKIN_DEPENDS roscpp uav_abstraction_layer
+				INCLUDE_DIRS include
+			)
+			list(APPEND MGUI_DEFINITIONS "MGUI_USE_CATKIN")
+		endif(${catkin_FOUND})
+	endif(${USE_CATKIN})
+
+	if(${USE_ROS})
+		find_package(catkin REQUIRED roscpp )
+		if(${catkin_FOUND})
+			catkin_package(
+				CATKIN_DEPENDS roscpp 
+				INCLUDE_DIRS include
+			)
+			list(APPEND MGUI_DEFINITIONS "MGUI_USE_ROS")
+		endif(${catkin_FOUND})
+	endif(${USE_ROS})
+
+endif()
 
 #########################################
 ######			Library 		   ######

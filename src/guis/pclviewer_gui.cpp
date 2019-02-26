@@ -100,6 +100,7 @@ bool PCLViewer_gui::configureGUI(int _argc, char **_argv)
 
     typeCallbackPose_ = configFile_["type_callback"].GetString();
     nameCallbackPose_ = configFile_["callback_name"].GetString();
+    nameWPPose_ = configFile_["wp_name"].GetString();
     ipCallbackPose_ = configFile_["callback_ip"].GetString();
     portCallbackPose_ = configFile_["callback_port"].GetInt();
     portWaypoint_ = configFile_["wp_port"].GetInt();
@@ -118,34 +119,45 @@ bool PCLViewer_gui::configureGUI(int _argc, char **_argv)
         return false;
     }
 
-    if(typeCallbackPose_ == "fastcom"){
-        subsPose_ = new fastcom::Subscriber<pose>(ipCallbackPose_, portCallbackPose_);
-        pubWP_ = new fastcom::Publisher<pose>(portWaypoint_);
-    }else if(typeCallbackPose_ == "ros"){
+    #ifdef MGUI_USE_FASTCOM
+        if(typeCallbackPose_ == "fastcom"){
+            subsPose_ = new fastcom::Subscriber<pose>(ipCallbackPose_, portCallbackPose_);
+            pubWP_ = new fastcom::Publisher<pose>(portWaypoint_);
+        }
+    #endif
+    
+    #ifdef MGUI_USE_ROS
+        if(typeCallbackPose_ == "ros"){
+            ros::NodeHandle nh;
 
-    }else{
+        }
+    #endif
+
+    if((typeCallbackPose_ != "ros") && (typeCallbackPose_ != "fastcom")){
         std::cout << "ERROR! You use a unrecognized type of callback" << std::endl;
         return false;
     }
 
     lastTimePose_ = std::chrono::high_resolution_clock::now();
 
-    // Callback of received pose
-    subsPose_->attachCallback([&](pose &_data){
-        objectLock_.lock();
-        poseX_ = _data.x;
-        poseY_ = _data.y;
-        poseZ_ = _data.z;
-        objectLock_.unlock();
+    #ifdef MGUI_USE_FASTCOM
+        // Callback of received pose
+        subsPose_->attachCallback([&](pose &_data){
+            objectLock_.lock();
+            poseX_ = _data.x;
+            poseY_ = _data.y;
+            poseZ_ = _data.z;
+            objectLock_.unlock();
 
-        if(pathModelPose_ != ""){
-            auto t1 = std::chrono::high_resolution_clock::now();
-            if(std::chrono::duration_cast<std::chrono::milliseconds>(t1 - lastTimePose_).count() > 100){
-                lastTimePose_ = t1;
-                emit poseUAVchanged(); 
+            if(pathModelPose_ != ""){
+                auto t1 = std::chrono::high_resolution_clock::now();
+                if(std::chrono::duration_cast<std::chrono::milliseconds>(t1 - lastTimePose_).count() > 100){
+                    lastTimePose_ = t1;
+                    emit poseUAVchanged(); 
+                }
             }
-        }
-    });
+        });
+    #endif
     
     LogTray::init("Trajectory_" + std::to_string(time(NULL)));
 
@@ -425,23 +437,26 @@ void PCLViewer_gui::run_generateTray(){
 //---------------------------------------------------------------------------------------------------------------------
 void PCLViewer_gui::run_sendMision(){
 
-    for(unsigned i = 0; i < trayectory_.size(); i++){
-        pose msg;
-        msg.x = trayectory_[i].second[0];
-        msg.y = trayectory_[i].second[1];
-        msg.z = trayectory_[i].second[2];
-        pubWP_->publish(msg);
+    #ifdef MGUI_USE_FASTCOM
+        for(unsigned i = 0; i < trayectory_.size(); i++){
+            pose msg;
+            msg.x = trayectory_[i].second[0];
+            msg.y = trayectory_[i].second[1];
+            msg.z = trayectory_[i].second[2];
+            pubWP_->publish(msg);
+            std::this_thread::sleep_for(std::chrono::milliseconds(100)); 
+        }
+
+        // 666 TODO: NOT WORKING GET POINTS TRAYECTORY
+
+        pose msgFinalLand;
+        msgFinalLand.x = poseX_;
+        msgFinalLand.y = poseY_;
+        msgFinalLand.z = poseZ_ + 1.5;
+        pubWP_->publish(msgFinalLand);
         std::this_thread::sleep_for(std::chrono::milliseconds(100)); 
-    }
-
-    // 666 TODO: NOT WORKING GET POINTS TRAYECTORY
-
-    pose msgFinalLand;
-    msgFinalLand.x = poseX_;
-    msgFinalLand.y = poseY_;
-    msgFinalLand.z = poseZ_ + 1.5;
-    pubWP_->publish(msgFinalLand);
-    std::this_thread::sleep_for(std::chrono::milliseconds(100)); 
+    #endif
+    
 
 }
 
@@ -546,6 +561,11 @@ bool PCLViewer_gui::extractPointCloud(std::string _dir)
             PointCloudT2::Ptr cloudUAV;
             cloudUAV.reset (new PointCloudT2);
             pcl::fromPCLPointCloud2(untransformedUav_.cloud, *cloudUAV);
+            for(size_t i = 0; i < cloudUAV->points.size(); i++){
+                cloudUAV->points[i].r = 255;
+                cloudUAV->points[i].g = 255;
+                cloudUAV->points[i].b = 255;
+            }
             viewer_->addPointCloud(cloudUAV, "uav_pose");
         }
         emit qvtkChanged();
@@ -652,6 +672,30 @@ void PCLViewer_gui::pointPickingOccurred(const pcl::visualization::PointPickingE
 
     removeOldSphere_ = true;
 }
+
+//---------------------------------------------------------------------------------------------------------------------
+#ifdef MGUI_USE_ROS
+    void PCLViewer_gui::CallbackPose(const geometry_msgs::PoseStamped::ConstPtr& _msg){
+        
+        objectLock_.lock();
+        poseX_ = _msg->pose.position.x;
+        poseY_ = _msg->pose.position.y;
+        poseZ_ = _msg->pose.position.z;
+        poseOX_ = _msg->pose.orientation.x;
+        poseOY_ = _msg->pose.orientation.y;
+        poseOZ_ = _msg->pose.orientation.z;
+        poseOW_ = _msg->pose.orientation.w;
+        objectLock_.unlock();
+
+        if(pathModelPose_ != ""){
+            auto t1 = std::chrono::high_resolution_clock::now();
+            if(std::chrono::duration_cast<std::chrono::milliseconds>(t1 - lastTimePose_).count() > 100){
+                lastTimePose_ = t1;
+                emit poseUAVchanged(); 
+            }
+        }
+    }
+#endif
 
 //---------------------------------------------------------------------------------------------------------------------
 void PCLViewer_gui::updateObjectUAV(){

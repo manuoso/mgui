@@ -47,8 +47,15 @@
 
 #include <vtkRenderWindow.h>
 
-#include <fastcom/Subscriber.h>
-#include <fastcom/Publisher.h>
+#ifdef MGUI_USE_FASTCOM
+    #include <fastcom/Subscriber.h>
+    #include <fastcom/Publisher.h>
+#endif
+
+#ifdef MGUI_USE_ROS
+    #include <ros/ros.h>
+    #include <geometry_msgs/PoseStamped.h>
+#endif
 
 #include <motion_planning/planners/rrtstar.h>
 #include <motion_planning/utils/splines.hpp>
@@ -129,6 +136,12 @@ private:
     /// \param _mesh: object to add
     void addObject(std::string _name, pcl::PolygonMesh _mesh);
 
+    #ifdef MGUI_USE_ROS
+        /// Method for visualize a change of pose from a topic of ROS
+        /// \param _msg: data receive to update pose
+        void CallbackPose(const geometry_msgs::PoseStamped::ConstPtr& _msg);
+    #endif
+    
     /// Method that update a UAV object in PCL GUI visualizer
     void updateObjectUAV();   
 
@@ -151,9 +164,17 @@ private:
     pcl::PolygonMesh untransformedUav_;
 
     std::chrono::time_point<std::chrono::high_resolution_clock> lastTimePose_;
-    fastcom::Subscriber<pose> *subsPose_ = nullptr;
-    fastcom::Publisher<pose> *pubWP_ = nullptr;
+    
+    #ifdef MGUI_USE_FASTCOM
+        fastcom::Subscriber<pose> *subsPose_ = nullptr;
+        fastcom::Publisher<pose> *pubWP_ = nullptr;
+    #endif
 
+    #ifdef MGUI_USE_ROS
+        ros::Subscriber poseSub_;
+        ros::Publisher wpPub_;
+    #endif
+    
     bool convertAndSave_ = false;
     bool usePCD_ = false;
     bool usePLY_ = false;
@@ -164,6 +185,7 @@ private:
     std::string typePoint_ = "";
     std::string typeCallbackPose_ = "";
     std::string nameCallbackPose_ = "";
+    std::string nameWPPose_ = "";
     std::string ipCallbackPose_ = "";
     int portCallbackPose_ = 0;
     int portWaypoint_ = 0;
