@@ -159,6 +159,7 @@ class UAV_gui : public QMainWindow {
             fastcom::Subscriber<pose> *subsWP_ = nullptr;
 
             std::thread *velocityThread_, *localPoseThread_, *getVelThread_;
+            std::thread sendWPThread_;
             std::mutex objectLockPose_, objectLockVel_, objectLockState_, objectLock_;
             
             std::chrono::time_point<std::chrono::high_resolution_clock> lastTimePose_, lastTimeVel_, lastTimeSendVel_;	
@@ -172,6 +173,7 @@ class UAV_gui : public QMainWindow {
             bool printVel_ = false;
             bool sendVelocity_ = false;
             bool sendNextWP_ = false;
+            bool stopAll_ = false;
 };
 
 #endif // GUIS_UAV_GUI_H

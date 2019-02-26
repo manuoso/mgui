@@ -92,6 +92,9 @@ signals:
     /// Signal that warns that there is a change in the pose of the uav
     void poseUAVchanged();
 
+    /// Signal that warns that there is a change in qvtk widget and update it
+    void qvtkChanged();
+
 private slots:
     /// Slot that add waypoint into a vector of waypoints
     void addWaypoint();
@@ -128,6 +131,9 @@ private:
 
     /// Method that update a UAV object in PCL GUI visualizer
     void updateObjectUAV();   
+
+    /// Method that update QVTK widget in PCL GUI visualizer
+    void updateQVTK();   
 
     /// Method that split a string
     /// \param txt: line to split
@@ -184,6 +190,7 @@ private:
     float poseX_ = 0.0, poseY_ = 0.0, poseZ_ = 0.0, poseOX_ = 0.0, poseOY_ = 0.0, poseOZ_ = 0.0, poseOW_ = 1.0;
     float leicaX_ = 0.0, leicaY_ = 0.0, leicaZ_ = 0.0;
 
+    std::thread trajThread_;
     std::mutex objectLock_;
 
 };

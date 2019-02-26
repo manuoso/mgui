@@ -251,7 +251,7 @@ void UAV_gui::run_getVelo(){
 
     printVel_ = true;
     getVelThread_ = new std::thread([&]{
-        while(printVel_){
+        while(printVel_ && !stopAll_){
             auto t1 = std::chrono::high_resolution_clock::now();
             if(std::chrono::duration_cast<std::chrono::milliseconds>(t1 - lastTimeVel_).count() > 50){
                 lastTimeVel_ = t1;
@@ -281,7 +281,7 @@ void UAV_gui::run_localPose(){
 
     printLocalPose_ = true;
     localPoseThread_ = new std::thread([&]{
-        while(printLocalPose_){
+        while(printLocalPose_ && !stopAll_){
             auto t1 = std::chrono::high_resolution_clock::now();
             if(std::chrono::duration_cast<std::chrono::milliseconds>(t1 - lastTimePose_).count() > 50){
                 lastTimePose_ = t1;
@@ -375,7 +375,7 @@ void UAV_gui::run_velocity(){
 
     sendVelocity_ = true;
     velocityThread_ = new std::thread([&]{
-        while(sendVelocity_){
+        while(sendVelocity_ && !stopAll_){
             command msg;
             msg.type = 5;
             msg.x = sendVelUAV_.x;
@@ -410,24 +410,29 @@ void UAV_gui::run_wayPoints(){
 
     sendNextWP_ = false;
 
-   // for(int i = waypoints_.size()-1 ; i > -1; i--){ // SE LEEN AL REVES! BE CAREFULLY 
-    for(int i = 0 ; i < waypoints_.size(); i++){
-        command msg;
-        msg.type = 4;
-        msg.x = waypoints_[i].second[0];
-        msg.y = waypoints_[i].second[1];
-        msg.z = waypoints_[i].second[2];
-        if(!sendVelocity_){
-            pubCommand_->publish(msg);
-        }else{
-            std::cout << "Cant send position while you are sending velocity" << std::endl;
-        }
-        while(!sendNextWP_){
-            std::this_thread::sleep_for(std::chrono::milliseconds(100)); 
-        }
-        sendNextWP_ = false;
-    }
+    sendWPThread_ = std::thread([&](){
+        // for(int i = waypoints_.size()-1 ; i > -1; i--){ // SE LEEN AL REVES! BE CAREFULLY 
+        for(int i = 0 ; i < waypoints_.size(); i++){
+            if(stopAll_){
+                break;
+            }
 
+            command msg;
+            msg.type = 4;
+            msg.x = waypoints_[i].second[0];
+            msg.y = waypoints_[i].second[1];
+            msg.z = waypoints_[i].second[2];
+            if(!sendVelocity_){
+                pubCommand_->publish(msg);
+            }else{
+                std::cout << "Cant send position while you are sending velocity" << std::endl;
+            }
+            while(!sendNextWP_ && !stopAll_){
+                std::this_thread::sleep_for(std::chrono::milliseconds(100)); 
+            }
+            sendNextWP_ = false;
+        }
+    });
 }
 
 //---------------------------------------------------------------------------------------------------------------------
@@ -436,6 +441,7 @@ void UAV_gui::delete_waypoints(){
     QList<QListWidgetItem*> items = ui->listWidget_WayPoints->selectedItems();
     foreach(QListWidgetItem * item, items){
         int index = ui->listWidget_WayPoints->row(item);
+        //std::cout << "index:" << index << std::endl;
         waypoints_.erase(waypoints_.begin() + index);
         delete ui->listWidget_WayPoints->takeItem(ui->listWidget_WayPoints->row(item));
     }
@@ -445,6 +451,7 @@ void UAV_gui::delete_waypoints(){
 //---------------------------------------------------------------------------------------------------------------------
 void UAV_gui::emergencyStop(){
 
+    stopAll_ = true;
     command msg;
     msg.type = 6;
     sendVelocity_ = false;
