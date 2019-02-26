@@ -26,6 +26,10 @@ project(mgui VERSION 0.1 LANGUAGES C CXX)
 ######		Configure project		######
 ##########################################
 
+# Communications with Fastcom
+set(USE_FASTCOM ON)
+set(USE_ROS OFF)
+
 # GUIs
 set(USE_GUI ON)
 
@@ -86,8 +90,10 @@ list(APPEND MGUI_DEFINITIONS "MGUI_USE_RAPIDJSON")
 
 #########################################
 ## Load fastcom
-find_package(fastcom REQUIRED)
-list(APPEND MGUI_DEFINITIONS "MGUI_USE_FASTCOM")
+if(${USE_FASTCOM})
+	find_package(fastcom REQUIRED)
+	list(APPEND MGUI_DEFINITIONS "MGUI_USE_FASTCOM")
+endif(${USE_FASTCOM})
 
 #########################################
 ## Load motion_planning
@@ -150,10 +156,20 @@ endif(${USE_CATKIN})
 #add_definitions(-fopenmp)
 
 # Collect all sources
-file(GLOB_RECURSE MGUI_SOURCE_FILES "src/*.cpp" "src/*.c")
-file(GLOB_RECURSE MGUI_HEADER_FILES "include/*.h" "include/*.inl")
- 
-add_library(${PROJECT_NAME} SHARED ${MGUI_HEADER_FILES} ${MGUI_SOURCE_FILES})
+if(${USE_GUI})
+	file(GLOB_RECURSE MGUI_GUIS_SOURCE_FILES "src/guis/*.cpp" "src/guis/*.c")
+	file(GLOB_RECURSE MGUI_GUIS_HEADER_FILES "include/mgui/guis/*.h" "include/mgui/guis/*.inl")
+endif(${USE_GUI})
+
+if(${USE_REC})
+	file(GLOB_RECURSE MGUI_REC_SOURCE_FILES "src/receivers/*.cpp" "src/receivers/*.c")
+	file(GLOB_RECURSE MGUI_REC_HEADER_FILES "include/mgui/receivers/*.h" "include/mgui/receivers/*.inl")
+endif(${USE_REC})
+
+file(GLOB_RECURSE MGUI_LOG_SOURCE_FILES "src/LogTray.cpp")
+file(GLOB_RECURSE MGUI_LOG_HEADER_FILES "include/LogTray*.h")
+
+add_library(${PROJECT_NAME} SHARED ${MGUI_GUIS_HEADER_FILES} ${MGUI_GUIS_SOURCE_FILES} ${MGUI_REC_HEADER_FILES} ${MGUI_REC_SOURCE_FILES} ${MGUI_LOG_HEADER_FILES} ${MGUI_LOG_SOURCE_FILES})
 
 target_include_directories(${PROJECT_NAME} PRIVATE ${PROJECT_SOURCE_DIR}/include) 
 
@@ -171,7 +187,9 @@ target_include_directories(${PROJECT_NAME} PUBLIC "/usr/include/eigen3")
 target_include_directories(${PROJECT_NAME} PUBLIC ${RAPIDJSON_INCLUDE_DIRS})
 target_link_libraries(${PROJECT_NAME} LINK_PUBLIC ${RAPIDJSON_LIBRARIES})
 
-target_link_libraries(${PROJECT_NAME} PRIVATE fastcom::fastcom)
+if(${USE_FASTCOM})
+	target_link_libraries(${PROJECT_NAME} PRIVATE fastcom::fastcom)
+endif(${USE_FASTCOM})
 
 if(${USE_GUI})
 	target_link_libraries(${PROJECT_NAME} LINK_PUBLIC ${QT5_LIBRARIES})
@@ -179,7 +197,7 @@ if(${USE_GUI})
 	target_link_libraries(${PROJECT_NAME} LINK_PUBLIC ${PCL_LIBRARIES})
 	target_link_libraries(${PROJECT_NAME} LINK_PUBLIC Marble)
 	target_link_libraries(${PROJECT_NAME} PRIVATE motion_planning::motion_planning)
-endif()
+endif(${USE_GUI})
 
 if(${catkin_FOUND})
 	target_include_directories(${PROJECT_NAME} PUBLIC ${catkin_INCLUDE_DIRS})
