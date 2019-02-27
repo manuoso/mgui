@@ -1,0 +1,4 @@
+bool req
+geometry_msgs/PoseStamped poseWP
+---
+bool success

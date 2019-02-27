@@ -7,5 +7,12 @@
 	"portPose":8002,
 	"portVel":8003,
 	"portCheck":8004,
-	"portWP":8005
+	"portWP":8005,
+	"callback_pose":"",
+	"callback_vel":"",
+	"callback_state":"",
+	"wp_srv":"",
+	"command_srv":"",
+	"position_srv":"",
+	"velocity_pub":""
 }

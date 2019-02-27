@@ -1,0 +1,6 @@
+bool req
+uint8 type
+float32 height
+geometry_msgs/PoseStamped poseWP
+---
+bool success

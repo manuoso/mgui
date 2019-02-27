@@ -55,6 +55,7 @@
 #ifdef MGUI_USE_ROS
     #include <ros/ros.h>
     #include <geometry_msgs/PoseStamped.h>
+    #include <mgui/WaypointData.h>
 #endif
 
 #include <motion_planning/planners/rrtstar.h>
@@ -88,12 +89,12 @@ public:
     /// \return true if params are good or without errors, false if something failed
     bool configureGUI(int _argc, char **_argv);
 
-    /// Struct for received pose of the UAV
+    /// Struct for received pose and send the velocity of the UAV
     struct pose{
-		float x;
-		float y;
-		float z;
-	    };
+        float x;
+        float y;
+        float z;
+    };
 
 signals:
     /// Signal that warns that there is a change in the pose of the uav
@@ -172,7 +173,7 @@ private:
 
     #ifdef MGUI_USE_ROS
         ros::Subscriber poseSub_;
-        ros::Publisher wpPub_;
+        ros::ServiceClient wpSrv_;
     #endif
     
     bool convertAndSave_ = false;
@@ -185,7 +186,7 @@ private:
     std::string typePoint_ = "";
     std::string typeCallbackPose_ = "";
     std::string nameCallbackPose_ = "";
-    std::string nameWPPose_ = "";
+    std::string nameWPSrv_ = "";
     std::string ipCallbackPose_ = "";
     int portCallbackPose_ = 0;
     int portWaypoint_ = 0;

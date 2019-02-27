@@ -128,13 +128,28 @@ endif()
 #########################################
 # catking
 if(${USE_CATKIN} AND ${USE_ROS} STREQUAL "TRUE")
-	find_package(catkin REQUIRED roscpp uav_abstraction_layer )
+	find_package(catkin REQUIRED 
+												roscpp 
+												uav_abstraction_layer 
+												geometry_msgs
+												std_msgs
+												message_generation
+												std_srvs)
+	add_service_files(
+		FILES
+		WaypointData.srv
+		CommandData.srv
+		VelocityData.srv
+	)
+	generate_messages(
+		DEPENDENCIES std_msgs geometry_msgs
+	)
 	if(${catkin_FOUND})
 		catkin_package(
-			CATKIN_DEPENDS roscpp uav_abstraction_layer
+			CATKIN_DEPENDS roscpp uav_abstraction_layer std_msgs geometry_msgs message_runtime std_srvs
 			INCLUDE_DIRS include
 		)
-		list(APPEND MGUI_DEFINITIONS "MGUI_USE_CATKIN_ROS")
+		list(APPEND MGUI_DEFINITIONS "MGUI_USE_ROS")
 	endif(${catkin_FOUND})
 else()
 	if(${USE_CATKIN})
@@ -149,17 +164,29 @@ else()
 	endif(${USE_CATKIN})
 
 	if(${USE_ROS})
-		find_package(catkin REQUIRED roscpp )
+	find_package(catkin REQUIRED 
+												roscpp 
+												geometry_msgs
+												std_msgs
+												message_generation
+												std_srvs)
+	add_service_files(
+		FILES
+		WaypointData.srv
+		CommandData.srv
+		VelocityData.srv
+	)
+	generate_messages(
+		DEPENDENCIES std_msgs geometry_msgs
+	)
 		if(${catkin_FOUND})
 			catkin_package(
-				CATKIN_DEPENDS roscpp 
+				CATKIN_DEPENDS roscpp std_msgs geometry_msgs message_runtime std_srvs
 				INCLUDE_DIRS include
 			)
 			list(APPEND MGUI_DEFINITIONS "MGUI_USE_ROS")
 		endif(${catkin_FOUND})
 	endif(${USE_ROS})
-
-endif()
 
 #########################################
 ######			Library 		   ######

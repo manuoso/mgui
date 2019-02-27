@@ -119,94 +119,131 @@ bool UAV_gui::configureGUI(int _argc, char **_argv){
     int portCheck = configFile_["portCheck"].GetInt();
     int portWP = configFile_["portWP"].GetInt();
 
-    // Initialize Fastcom publishers and subscribers
-    pubCommand_ = new fastcom::Publisher<command>(portCommand);
-    subsState_ = new fastcom::Subscriber<int>(ip, portState);
-    subsPose_ = new fastcom::Subscriber<pose>(ip, portPose);
-    subsVel_ = new fastcom::Subscriber<pose>(ip, portVel);
-    subsCheck_ = new fastcom::Subscriber<int>(ip, portCheck);
-    subsWP_ = new fastcom::Subscriber<pose>(ipWP, portWP);
+    std::string nameCallbackPose = configFile_["callback_pose"].GetString();
+    std::string nameCallbackVel = configFile_["callback_vel"].GetString();
+    std::string nameCallbackState = configFile_["callback_state"].GetString();
+    std::string nameWPSrv = configFile_["wp_srv"].GetString();
+    std::string nameCommandSrv = configFile_["command_srv"].GetString();
+    std::string namePositionSrv = configFile_["position_srv"].GetString();
+    std::string nameVelocityPub = configFile_["velocity_pub"].GetString();
 
-    // Callback of received commands
-    subsState_->attachCallback([&](const int &_data){
-        int cpy;
-        bool dataChanged = false;
-        objectLockState_.lock();
-        cpy = _data;
-        objectLockState_.unlock();
-        if(cpy == 1){
-            stateUAV_ = "WAIT";
-            dataChanged = true;
-        }else if(cpy == 2){
-            stateUAV_ = "TAKEOFF";
-            dataChanged = true;
-        }else if(cpy == 3){
-            stateUAV_ = "LAND";
-            dataChanged = true;
-        }else if(cpy == 4){
-            stateUAV_ = "MOVE_POSITION";
-            dataChanged = true;
-        }else if(cpy == 5){
-            stateUAV_ = "MOVE_VELOCITY";
-            dataChanged = true;
-        }else if(cpy == 6){
-            stateUAV_ = "EXIT";
-            dataChanged = true;
-        }else{
-            stateUAV_ = "UNRECOGNIZED";
-            dataChanged = true;
-            std::cout << "Received unrecognized state" << std::endl;
-        }
+    #ifdef MGUI_USE_FASTCOM
+        // Initialize Fastcom publishers and subscribers
+        pubCommand_ = new fastcom::Publisher<command>(portCommand);
+        subsState_ = new fastcom::Subscriber<int>(ip, portState);
+        subsPose_ = new fastcom::Subscriber<pose>(ip, portPose);
+        subsVel_ = new fastcom::Subscriber<pose>(ip, portVel);
+        subsCheck_ = new fastcom::Subscriber<int>(ip, portCheck);
+        subsWP_ = new fastcom::Subscriber<pose>(ipWP, portWP);
 
-        if(dataChanged){
-            emit stateChanged(); 
-        }     
-    });
+        // Callback of received commands
+        subsState_->attachCallback([&](const int &_data){
+            bool dataChanged = false;
+            int cpy = _data;
+            if(cpy != stateUAV_){
+                if(cpy == 1){
+                    objectLockState_.lock();
+                    stateUAV_ = "WAIT";
+                    objectLockState_.unlock();
+                    dataChanged = true;
+                }else if(cpy == 2){
+                    objectLockState_.lock();
+                    stateUAV_ = "TAKEOFF";
+                    objectLockState_.unlock();
+                    dataChanged = true;
+                }else if(cpy == 3){                    
+                    objectLockState_.lock();
+                    stateUAV_ = "LAND";
+                    objectLockState_.unlock();
+                    dataChanged = true;
+                }else if(cpy == 4){                    
+                    objectLockState_.lock();
+                    stateUAV_ = "MOVE_POSITION";
+                    objectLockState_.unlock();
+                    dataChanged = true;
+                }else if(cpy == 5){                    
+                    objectLockState_.lock();
+                    stateUAV_ = "MOVE_VELOCITY";
+                    objectLockState_.unlock();
+                    dataChanged = true;
+                }else if(cpy == 6){                   
+                    objectLockState_.lock();
+                    stateUAV_ = "EXIT";
+                    objectLockState_.unlock();
+                    dataChanged = true;
+                }else{                   
+                    objectLockState_.lock();
+                    stateUAV_ = "UNRECOGNIZED";
+                    objectLockState_.unlock();
+                    dataChanged = true;
+                    std::cout << "Received unrecognized state" << std::endl;
+                }
+            }
+            
+            if(dataChanged){
+                emit stateChanged(); 
+            }     
+        });
 
-    // Callback of received pose
-    subsPose_->attachCallback([&](const pose &_data){
-        objectLockPose_.lock();
-        poseUAV_.x = _data.x;
-        poseUAV_.y = _data.y;
-        poseUAV_.z = _data.z;
-        objectLockPose_.unlock();
-    });
-    
-    // Callback of received velocity
-    subsVel_->attachCallback([&](const pose &_data){
-        objectLockVel_.lock();
-        velUAV_.x = _data.x;
-        velUAV_.y = _data.y;
-        velUAV_.z = _data.z;
-        objectLockVel_.unlock();
-    });
+        // Callback of received pose
+        subsPose_->attachCallback([&](const pose &_data){
+            objectLockPose_.lock();
+            poseUAV_.x = _data.x;
+            poseUAV_.y = _data.y;
+            poseUAV_.z = _data.z;
+            objectLockPose_.unlock();
+        });
+        
+        // Callback of received velocity
+        subsVel_->attachCallback([&](const pose &_data){
+            objectLockVel_.lock();
+            velUAV_.x = _data.x;
+            velUAV_.y = _data.y;
+            velUAV_.z = _data.z;
+            objectLockVel_.unlock();
+        });
 
-    // Callback of received check
-    subsCheck_->attachCallback([&](const int &_data){
-        if(_data == 1){
-            sendNextWP_ = true;
-        }else{
-            std::cout << "Received unrecognized check" << std::endl;
-            sendNextWP_ = false;
-        }
-    });
+        // Callback of received check
+        subsCheck_->attachCallback([&](const int &_data){
+            if(_data == 1){
+                sendNextWP_ = true;
+            }else{
+                std::cout << "Received unrecognized check" << std::endl;
+                sendNextWP_ = false;
+            }
+        });
 
-    // Callback of received waypoints
-    subsWP_->attachCallback([&](const pose &_data){
-	    std::cout << "Received WP" << std::endl;
-        float x = _data.x;
-        float y = _data.y;
-        float z = _data.z;
+        // Callback of received waypoints
+        subsWP_->attachCallback([&](const pose &_data){
+            std::cout << "Received WP" << std::endl;
+            float x = _data.x;
+            float y = _data.y;
+            float z = _data.z;
 
-        if((x != 0) && (y != 0) && (z != 0)){
-            int id = idWP_;
-            idWP_++;
-            std::vector<double> point = {x, y, z};
-            waypoints_.push_back(std::make_pair(id, point));
+            if((x != 0) && (y != 0) && (z != 0)){
+                int id = idWP_;
+                idWP_++;
+                std::vector<double> point = {x, y, z};
+                waypoints_.push_back(std::make_pair(id, point));
 
-            emit listWPChanged();
-        }
-    });
+                emit listWPChanged();
+            }
+        });
+    #endif
+
+    #ifdef MGUI_USE_ROS
+        ros::NodeHandle nh;
+        poseSub_ = nh.subscribe(nameCallbackPose, 1, &UAV_gui::CallbackPose, this);
+        velSub_ = nh.subscribe(nameCallbackVel, 1, &UAV_gui::CallbackVel, this);
+        stateSub_ = nh.subscribe(nameCallbackState, 1, &UAV_gui::CallbackState, this);
+
+        wpSrvRec_ = nh.advertiseService(nameWPSrv, &UAV_gui::CallbackWP, this);  
+        commandSrv_ = nh.serviceClient<mgui::CommandData>(nameCommandSrv);
+        positionSrv_ = nh.serviceClient<mgui::CommandData>(namePositionSrv);
+
+        velocityPub_ = nh.advertise<geometry_msgs::TwistStamped>(nameVelocityPub, 1);
+
+    #endif
 
     lastTimePose_ = std::chrono::high_resolution_clock::now();
     lastTimeVel_ = std::chrono::high_resolution_clock::now();
@@ -229,20 +266,59 @@ void UAV_gui::takeOff(){
     qTakeOff = ui->lineEdit_takeoff->text();
     float takeOff;
     takeOff = qTakeOff.toFloat();
+    
+    #ifdef MGUI_USE_FASTCOM
+        command msg;
+        msg.type = 2;
+        msg.height = takeOff;
+        pubCommand_->publish(msg);
+    #endif
 
-    command msg;
-    msg.type = 2;
-    msg.height = takeOff;
-    pubCommand_->publish(msg);
+    #ifdef MGUI_USE_ROS
+        mgui::CommandData srv;
+        srv.request.req = true;
+        srv.request.type = 2;
+        srv.request.height = takeOff;
+
+        if(commandSrv_.call(srv)){
+            if(srv.response.success){
+                std::cout << "Service of Send Command success" << std::endl;
+            }else{
+                std::cout << "Service of Send Command failed" << std::endl;
+            }
+        }else{
+            std::cout << "Failed to call service of Send Command" << std::endl;
+        }
+
+    #endif
 
 }
 
 //---------------------------------------------------------------------------------------------------------------------
 void UAV_gui::land(){
 
-    command msg;
-    msg.type = 3;
-    pubCommand_->publish(msg);
+    #ifdef MGUI_USE_FASTCOM
+        command msg;
+        msg.type = 3;
+        pubCommand_->publish(msg);
+    #endif
+
+    #ifdef MGUI_USE_ROS
+        mgui::CommandData srv;
+        srv.request.req = true;
+        srv.request.type = 3;
+
+        if(commandSrv_.call(srv)){
+            if(srv.response.success){
+                std::cout << "Service of Send Command success" << std::endl;
+            }else{
+                std::cout << "Service of Send Command failed" << std::endl;
+            }
+        }else{
+            std::cout << "Failed to call service of Send Command" << std::endl;
+        }
+
+    #endif
 
 }
 
@@ -319,16 +395,45 @@ void UAV_gui::run_customPose()
     y = qY.toFloat();
     z = qZ.toFloat();
 
-    command msg;
-    msg.type = 4;
-    msg.x = x;
-    msg.y = y;
-    msg.z = z;
-    if(!sendVelocity_){
-        pubCommand_->publish(msg);
+    #ifdef MGUI_USE_FASTCOM
+        command msg;
+        msg.type = 4;
+        msg.x = x;
+        msg.y = y;
+        msg.z = z;
+        if(!sendVelocity_){
+            pubCommand_->publish(msg);
         }else{
-        std::cout << "Cant send position while you are sending velocity" << std::endl;
-    }
+            std::cout << "Cant send position while you are sending velocity" << std::endl;
+        }
+    #endif
+
+    #ifdef MGUI_USE_ROS
+        mgui::WaypointData srv;
+        srv.request.req = true;
+        srv.request.type = 4;
+
+        srv.request.poseWP.header.stamp = ros::Time::now();
+        srv.request.poseWP.header.frame_id = "wp";
+        srv.request.poseWP.pose.position.x = x;
+        srv.request.poseWP.pose.position.y = y;
+        srv.request.poseWP.pose.position.z = z;  
+        srv.request.poseWP.pose.orientation.x = 0; 
+        srv.request.poseWP.pose.orientation.y = 0; 
+        srv.request.poseWP.pose.orientation.z = 0;  
+        srv.request.poseWP.pose.orientation.w = 1; 
+
+        if(positionSrv_.call(srv)){
+            if(srv.response.success){
+                std::cout << "Service of Send Command success" << std::endl;
+            }else{
+                std::cout << "Service of Send Command failed" << std::endl;
+            }
+        }else{
+            std::cout << "Failed to call service of Send Command" << std::endl;
+        }
+
+    #endif
 
 }
 
@@ -374,6 +479,8 @@ void UAV_gui::run_velocity(){
     sendVelUAV_.z = z;
 
     sendVelocity_ = true;
+
+    #ifdef MGUI_USE_FASTCOM
     velocityThread_ = new std::thread([&]{
         while(sendVelocity_ && !stopAll_){
             command msg;
@@ -382,12 +489,34 @@ void UAV_gui::run_velocity(){
             msg.y = sendVelUAV_.y;
             msg.z = sendVelUAV_.z;
             auto t1 = std::chrono::high_resolution_clock::now();
-     		if(std::chrono::duration_cast<std::chrono::milliseconds>(t1 - lastTimeSendVel_).count() > 50){
-                 lastTimeSendVel_ = t1;
-        		pubCommand_->publish(msg);
-    		}
+            if(std::chrono::duration_cast<std::chrono::milliseconds>(t1 - lastTimeSendVel_).count() > 50){
+                lastTimeSendVel_ = t1;
+                pubCommand_->publish(msg);
+            }
         }
     });
+    #endif
+
+    #ifdef MGUI_USE_ROS
+        mgui::VelocityData srv;
+        srv.request.req = true;
+        srv.request.continually = true;
+
+        srv.request.velocity.twist.linear.x = sendVelUAV_.x;
+        srv.request.velocity.twist.linear.y = sendVelUAV_.y;
+        srv.request.velocity.twist.linear.z = sendVelUAV_.z;
+
+        if(velocitySrv_.call(srv)){
+            if(srv.response.success){
+                std::cout << "Service of Send Velocity success" << std::endl;
+            }else{
+                std::cout << "Service of Send Velocity failed" << std::endl;
+            }
+        }else{
+            std::cout << "Failed to call service of Send Velocity" << std::endl;
+        }
+
+    #endif
     
     ui->Run_vel->setVisible(0);
     ui->Stop_vel->setVisible(1);
@@ -398,8 +527,33 @@ void UAV_gui::run_velocity(){
 void UAV_gui::stop_velocity(){
 
     sendVelocity_ = false;
-    velocityThread_->join();
-    delete velocityThread_;
+
+    #ifdef MGUI_USE_FASTCOM
+        velocityThread_->join();
+        delete velocityThread_;
+    #endif
+
+    #ifdef MGUI_USE_ROS
+        mgui::VelocityData srv;
+        srv.request.req = true;
+        srv.request.continually = false;
+
+        srv.request.velocity.twist.linear.x = 0;
+        srv.request.velocity.twist.linear.y = 0;
+        srv.request.velocity.twist.linear.z = 0;
+
+        if(velocitySrv_.call(srv)){
+            if(srv.response.success){
+                std::cout << "Service of Send Velocity success" << std::endl;
+            }else{
+                std::cout << "Service of Send Velocity failed" << std::endl;
+            }
+        }else{
+            std::cout << "Failed to call service of Send Velocity" << std::endl;
+        }
+
+    #endif
+
     ui->Run_vel->setVisible(1);
     ui->Stop_vel->setVisible(0);
 
@@ -417,20 +571,49 @@ void UAV_gui::run_wayPoints(){
                 break;
             }
 
-            command msg;
-            msg.type = 4;
-            msg.x = waypoints_[i].second[0];
-            msg.y = waypoints_[i].second[1];
-            msg.z = waypoints_[i].second[2];
-            if(!sendVelocity_){
-                pubCommand_->publish(msg);
-            }else{
-                std::cout << "Cant send position while you are sending velocity" << std::endl;
-            }
-            while(!sendNextWP_ && !stopAll_){
-                std::this_thread::sleep_for(std::chrono::milliseconds(100)); 
-            }
-            sendNextWP_ = false;
+            #ifdef MGUI_USE_FASTCOM
+                command msg;
+                msg.type = 4;
+                msg.x = waypoints_[i].second[0];
+                msg.y = waypoints_[i].second[1];
+                msg.z = waypoints_[i].second[2];
+                if(!sendVelocity_){
+                    pubCommand_->publish(msg);
+                }else{
+                    std::cout << "Cant send position while you are sending velocity" << std::endl;
+                }
+                while(!sendNextWP_ && !stopAll_){
+                    std::this_thread::sleep_for(std::chrono::milliseconds(100)); 
+                }
+                sendNextWP_ = false;
+            #endif
+            
+            #ifdef MGUI_USE_ROS
+                mgui::WaypointData srv;
+                srv.request.req = true;
+
+                srv.request.poseWP.header.stamp = ros::Time::now();
+                srv.request.poseWP.header.frame_id = "wp";
+                srv.request.poseWP.pose.position.x = waypoints_[i].second[0];
+                srv.request.poseWP.pose.position.y = waypoints_[i].second[1];
+                srv.request.poseWP.pose.position.z = waypoints_[i].second[2];  
+                srv.request.poseWP.pose.orientation.x = 0; 
+                srv.request.poseWP.pose.orientation.y = 0; 
+                srv.request.poseWP.pose.orientation.z = 0;  
+                srv.request.poseWP.pose.orientation.w = 1; 
+
+                if(positionSrv_.call(srv)){
+                    if(srv.response.success){
+                        std::cout << "Service of Send Position success" << std::endl;
+                    }else{
+                        std::cout << "Service of Send Position failed" << std::endl;
+                    }
+                }else{
+                    std::cout << "Failed to call service of Send Position" << std::endl;
+                }
+
+            #endif
+
         }
     });
 }
@@ -452,10 +635,30 @@ void UAV_gui::delete_waypoints(){
 void UAV_gui::emergencyStop(){
 
     stopAll_ = true;
-    command msg;
-    msg.type = 6;
-    sendVelocity_ = false;
-    pubCommand_->publish(msg);
+
+    #ifdef MGUI_USE_FASTCOM
+        command msg;
+        msg.type = 6;
+        sendVelocity_ = false;
+        pubCommand_->publish(msg);
+    #endif
+
+    #ifdef MGUI_USE_ROS
+        mgui::CommandData srv;
+        srv.request.req = true;
+        srv.request.type = 6;
+
+        if(commandSrv_.call(srv)){
+            if(srv.response.success){
+                std::cout << "Service of Send Command success" << std::endl;
+            }else{
+                std::cout << "Service of Send Command failed" << std::endl;
+            }
+        }else{
+            std::cout << "Failed to call service of Send Command" << std::endl;
+        }
+
+    #endif
 
 }
 
@@ -500,3 +703,96 @@ void UAV_gui::updateListWP(){
     //objectLock_.unlock();
 }
 
+//---------------------------------------------------------------------------------------------------------------------
+#ifdef MGUI_USE_ROS
+    void UAV_gui::CallbackPose(const geometry_msgs::PoseStamped::ConstPtr& _msg){
+        objectLockPose_.lock();
+        poseUAV_.x = _msg->pose.position.x;
+        poseUAV_.y = _msg->pose.position.y;
+        poseUAV_.z = _msg->pose.position.z;
+        objectLockPose_.unlock();
+        
+    }
+
+    //---------------------------------------------------------------------------------------------------------------------
+    void UAV_gui::CallbackVel(const geometry_msgs::TwistStamped::ConstPtr& _msg){
+        objectLockVel_.lock();
+        velUAV_.x = _msg->twist.linear.x;
+        velUAV_.y = _msg->twist.linear.y;
+        velUAV_.z = _msg->twist.linear.z;
+        objectLockVel_.unlock();
+
+    }
+
+    //---------------------------------------------------------------------------------------------------------------------
+    void UAV_gui::CallbackState(const std_msgs::UInt8::ConstPtr& _msg){
+        bool dataChanged = false;
+        unsigned int cpy = _msg->data;
+        if(cpy != stateUAV_){
+            if(cpy == 1){
+                objectLockState_.lock();
+                stateUAV_ = "WAIT";
+                objectLockState_.unlock();
+                dataChanged = true;
+            }else if(cpy == 2){
+                objectLockState_.lock();
+                stateUAV_ = "TAKEOFF";
+                objectLockState_.unlock();
+                dataChanged = true;
+            }else if(cpy == 3){                    
+                objectLockState_.lock();
+                stateUAV_ = "LAND";
+                objectLockState_.unlock();
+                dataChanged = true;
+            }else if(cpy == 4){                    
+                objectLockState_.lock();
+                stateUAV_ = "MOVE_POSITION";
+                objectLockState_.unlock();
+                dataChanged = true;
+            }else if(cpy == 5){                    
+                objectLockState_.lock();
+                stateUAV_ = "MOVE_VELOCITY";
+                objectLockState_.unlock();
+                dataChanged = true;
+            }else if(cpy == 6){                   
+                objectLockState_.lock();
+                stateUAV_ = "EXIT";
+                objectLockState_.unlock();
+                dataChanged = true;
+            }else{                   
+                objectLockState_.lock();
+                stateUAV_ = "UNRECOGNIZED";
+                objectLockState_.unlock();
+                dataChanged = true;
+                std::cout << "Received unrecognized state" << std::endl;
+            }
+        }
+        
+        if(dataChanged){
+            emit stateChanged(); 
+        } 
+
+    }
+    
+    //---------------------------------------------------------------------------------------------------------------------
+    void UAV_gui::CallbackWP(mgui::WaypointData::Request &_req, mgui::WaypointData::Response &_res){
+
+        if(_req.req){
+            std::cout << "Received WP" << std::endl;
+            float x = _req.poseWP.pose.position.x;
+            float y = _req.poseWP.pose.position.y;
+            float z = _req.poseWP.pose.position.z;
+
+            if((x != 0) && (y != 0) && (z != 0)){
+                int id = idWP_;
+                idWP_++;
+                std::vector<double> point = {x, y, z};
+                waypoints_.push_back(std::make_pair(id, point));
+
+                emit listWPChanged();
+            }
+        }
+        _res.success = true;
+    }
+
+#endif

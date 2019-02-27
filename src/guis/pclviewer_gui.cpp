@@ -99,8 +99,8 @@ bool PCLViewer_gui::configureGUI(int _argc, char **_argv)
     useSpline_ = configFile_["use_spline"].GetBool();
 
     typeCallbackPose_ = configFile_["type_callback"].GetString();
-    nameCallbackPose_ = configFile_["callback_name"].GetString();
-    nameWPPose_ = configFile_["wp_name"].GetString();
+    nameCallbackPose_ = configFile_["callback_pose"].GetString();
+    nameWPSrv_ = configFile_["wp_srv"].GetString();
     ipCallbackPose_ = configFile_["callback_ip"].GetString();
     portCallbackPose_ = configFile_["callback_port"].GetInt();
     portWaypoint_ = configFile_["wp_port"].GetInt();
@@ -129,7 +129,8 @@ bool PCLViewer_gui::configureGUI(int _argc, char **_argv)
     #ifdef MGUI_USE_ROS
         if(typeCallbackPose_ == "ros"){
             ros::NodeHandle nh;
-
+            poseSub_ = nh.subscribe(nameCallbackPose_, 1, &PCLViewer_gui::CallbackPose, this);
+            wpSrv_ = nh.serviceClient<mgui::WaypointData>(nameWPSrv_);
         }
     #endif
 
@@ -457,6 +458,54 @@ void PCLViewer_gui::run_sendMision(){
         std::this_thread::sleep_for(std::chrono::milliseconds(100)); 
     #endif
     
+    #ifdef MGUI_USE_ROS
+        mgui::WaypointData srv;
+        srv.request.req = true;
+
+        for(unsigned i = 0; i < trayectory_.size(); i++){
+            srv.request.poseWP.header.stamp = ros::Time::now();
+            srv.request.poseWP.header.frame_id = "wp";
+            srv.request.poseWP.pose.position.x = trayectory_[i].second[0];
+            srv.request.poseWP.pose.position.y = trayectory_[i].second[1];
+            srv.request.poseWP.pose.position.z = trayectory_[i].second[2];  
+            srv.request.poseWP.pose.orientation.x = 0; 
+            srv.request.poseWP.pose.orientation.y = 0; 
+            srv.request.poseWP.pose.orientation.z = 0;  
+            srv.request.poseWP.pose.orientation.w = 1; 
+
+            if(wpSrv_.call(srv)){
+                if(srv.response.success){
+                    std::cout << "Service of Send Waypoints success" << std::endl;
+                }else{
+                    std::cout << "Service of Send Waypoints failed" << std::endl;
+                }
+            }else{
+                std::cout << "Failed to call service of Send Waypoints" << std::endl;
+            }	
+            std::this_thread::sleep_for(std::chrono::milliseconds(100)); 
+        }
+
+        // 666 TODO: NOT WORKING GET POINTS TRAYECTORY
+
+        srv.request.poseWP.pose.position.x = poseX_;
+        srv.request.poseWP.pose.position.y = poseY_;
+        srv.request.poseWP.pose.position.z = poseZ_ + 1.5; 
+        srv.request.poseWP.pose.orientation.x = 0; 
+        srv.request.poseWP.pose.orientation.y = 0; 
+        srv.request.poseWP.pose.orientation.z = 0;  
+        srv.request.poseWP.pose.orientation.w = 1; 
+
+        if(wpSrv_.call(srv)){
+            if(srv.response.success){
+                std::cout << "Service of Send Waypoints success" << std::endl;
+            }else{
+                std::cout << "Service of Send Waypoints failed" << std::endl;
+            }
+        }else{
+            std::cout << "Failed to call service of Send Waypoints" << std::endl;
+        }	
+        std::this_thread::sleep_for(std::chrono::milliseconds(100)); 
+    #endif
 
 }
 
