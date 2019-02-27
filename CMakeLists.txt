@@ -27,8 +27,8 @@ project(mgui VERSION 0.1 LANGUAGES C CXX)
 ##########################################
 
 # Communications with Fastcom
-set(USE_FASTCOM ON)
-set(USE_ROS OFF)
+set(USE_FASTCOM OFF)
+set(USE_ROS ON)
 
 # GUIs
 set(USE_GUI ON)
@@ -43,7 +43,7 @@ set(USE_CATKIN ON)
 #########################################
 ######   Check for communications  ######
 #########################################
-if(${USE_FASTCOM} AND ${USE_ROS} STREQUAL "TRUE")
+if(${USE_FASTCOM} AND ${USE_ROS} STREQUAL "ON")
 	MESSAGE( FATAL_ERROR "Couldnt use FASTCOM AND ROS in communications!")
 endif()
 
@@ -72,15 +72,16 @@ endif()
 #########################################
 ## Load PCL
 if(${USE_GUI})
-	find_package(PCL 1.8 QUIET REQUIRED)
-	if(${PCL_FOUND} AND ${VTK_FOUND} AND ${Boost_FOUND} AND ${FLANN_FOUND} STREQUAL "TRUE")
+	# 666 TODO: FIX THIS FOR PCL 1.9
+	find_package(PCL 1.9 QUIET REQUIRED)
+	#if(${PCL_FOUND} AND ${VTK_FOUND} AND ${Boost_FOUND} AND ${FLANN_FOUND} STREQUAL "TRUE")
 		MESSAGE( STATUS "Adding properly PCL and its dependencies")
 		add_definitions(-DENABLE_PCL)
 		add_definitions(${PCL_DEFINITIONS})
 		list(APPEND MGUI_DEFINITIONS "MGUI_USE_PCL")
-	else()
-		MESSAGE( FATAL_ERROR "Couldnt Add PCL and/or it's dependencies")
-	endif()
+	#else()
+	#	MESSAGE( FATAL_ERROR "Couldnt Add PCL and/or it's dependencies")
+	#endif()
 endif(${USE_GUI})
 
 #########################################
@@ -127,7 +128,8 @@ endif()
 
 #########################################
 # catking
-if(${USE_CATKIN} AND ${USE_ROS} STREQUAL "TRUE")
+if(${USE_CATKIN} AND ${USE_ROS} STREQUAL "ON")
+	MESSAGE( STATUS "Using CATKIN and ROS")
 	find_package(catkin REQUIRED 
 												roscpp 
 												uav_abstraction_layer 
@@ -153,6 +155,7 @@ if(${USE_CATKIN} AND ${USE_ROS} STREQUAL "TRUE")
 	endif(${catkin_FOUND})
 else()
 	if(${USE_CATKIN})
+		MESSAGE( STATUS "Using CATKIN")
 		find_package(catkin REQUIRED roscpp uav_abstraction_layer)
 		if(${catkin_FOUND})
 			catkin_package(
@@ -164,21 +167,22 @@ else()
 	endif(${USE_CATKIN})
 
 	if(${USE_ROS})
-	find_package(catkin REQUIRED 
-												roscpp 
-												geometry_msgs
-												std_msgs
-												message_generation
-												std_srvs)
-	add_service_files(
-		FILES
-		WaypointData.srv
-		CommandData.srv
-		VelocityData.srv
-	)
-	generate_messages(
-		DEPENDENCIES std_msgs geometry_msgs
-	)
+		MESSAGE( STATUS "Using ROS")
+		find_package(catkin REQUIRED 
+													roscpp 
+													geometry_msgs
+													std_msgs
+													message_generation
+													std_srvs)
+		add_service_files(
+			FILES
+			WaypointData.srv
+			CommandData.srv
+			VelocityData.srv
+		)
+		generate_messages(
+			DEPENDENCIES std_msgs geometry_msgs
+		)
 		if(${catkin_FOUND})
 			catkin_package(
 				CATKIN_DEPENDS roscpp std_msgs geometry_msgs message_runtime std_srvs
@@ -187,6 +191,7 @@ else()
 			list(APPEND MGUI_DEFINITIONS "MGUI_USE_ROS")
 		endif(${catkin_FOUND})
 	endif(${USE_ROS})
+endif()
 
 #########################################
 ######			Library 		   ######

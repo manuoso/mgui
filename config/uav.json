@@ -14,5 +14,5 @@
 	"wp_srv":"",
 	"command_srv":"",
 	"position_srv":"",
-	"velocity_pub":""
+	"velocity_srv":""
 }

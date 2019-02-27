@@ -29,9 +29,12 @@
 #include <QGraphicsItem>
 
 #include <iostream>
-#include <thread>
-#include <chrono>
+#include <stdio.h>
 #include <fstream>
+#include <chrono>
+#include <stdlib.h>
+#include <mutex>
+#include <thread>
 
 #include <marble/MarbleWidget.h>
 
@@ -169,8 +172,7 @@ class UAV_gui : public QMainWindow {
             void CallbackState(const std_msgs::UInt8::ConstPtr& _msg);
 
             /// Method for receive services with waypoints in ROS
-            /// \param _msg: data receive to add new waypoint
-            void CallbackWP(mgui::WaypointData::Request &_req, mgui::WaypointData::Response &_res);
+            bool CallbackWP(mgui::WaypointData::Request &_req, mgui::WaypointData::Response &_res);
 
         #endif
 
@@ -209,6 +211,7 @@ class UAV_gui : public QMainWindow {
         std::string idUAV_;
         std::string stateUAV_;
         pose poseUAV_, velUAV_, sendVelUAV_;
+        int oldData_ = 0;
         bool printLocalPose_ = false;
         bool printVel_ = false;
         bool sendVelocity_ = false;

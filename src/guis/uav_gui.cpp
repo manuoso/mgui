@@ -125,7 +125,7 @@ bool UAV_gui::configureGUI(int _argc, char **_argv){
     std::string nameWPSrv = configFile_["wp_srv"].GetString();
     std::string nameCommandSrv = configFile_["command_srv"].GetString();
     std::string namePositionSrv = configFile_["position_srv"].GetString();
-    std::string nameVelocityPub = configFile_["velocity_pub"].GetString();
+    std::string nameVelocitySrv = configFile_["velocity_srv"].GetString();
 
     #ifdef MGUI_USE_FASTCOM
         // Initialize Fastcom publishers and subscribers
@@ -140,7 +140,7 @@ bool UAV_gui::configureGUI(int _argc, char **_argv){
         subsState_->attachCallback([&](const int &_data){
             bool dataChanged = false;
             int cpy = _data;
-            if(cpy != stateUAV_){
+            if(cpy != oldData_){
                 if(cpy == 1){
                     objectLockState_.lock();
                     stateUAV_ = "WAIT";
@@ -178,6 +178,7 @@ bool UAV_gui::configureGUI(int _argc, char **_argv){
                     dataChanged = true;
                     std::cout << "Received unrecognized state" << std::endl;
                 }
+                oldData_ = cpy;
             }
             
             if(dataChanged){
@@ -239,9 +240,8 @@ bool UAV_gui::configureGUI(int _argc, char **_argv){
 
         wpSrvRec_ = nh.advertiseService(nameWPSrv, &UAV_gui::CallbackWP, this);  
         commandSrv_ = nh.serviceClient<mgui::CommandData>(nameCommandSrv);
-        positionSrv_ = nh.serviceClient<mgui::CommandData>(namePositionSrv);
-
-        velocityPub_ = nh.advertise<geometry_msgs::TwistStamped>(nameVelocityPub, 1);
+        positionSrv_ = nh.serviceClient<mgui::WaypointData>(namePositionSrv);
+        velocitySrv_ = nh.serviceClient<mgui::VelocityData>(nameVelocitySrv);
 
     #endif
 
@@ -411,10 +411,9 @@ void UAV_gui::run_customPose()
     #ifdef MGUI_USE_ROS
         mgui::WaypointData srv;
         srv.request.req = true;
-        srv.request.type = 4;
 
         srv.request.poseWP.header.stamp = ros::Time::now();
-        srv.request.poseWP.header.frame_id = "wp";
+        srv.request.poseWP.header.frame_id = "map";
         srv.request.poseWP.pose.position.x = x;
         srv.request.poseWP.pose.position.y = y;
         srv.request.poseWP.pose.position.z = z;  
@@ -593,7 +592,7 @@ void UAV_gui::run_wayPoints(){
                 srv.request.req = true;
 
                 srv.request.poseWP.header.stamp = ros::Time::now();
-                srv.request.poseWP.header.frame_id = "wp";
+                srv.request.poseWP.header.frame_id = "map";
                 srv.request.poseWP.pose.position.x = waypoints_[i].second[0];
                 srv.request.poseWP.pose.position.y = waypoints_[i].second[1];
                 srv.request.poseWP.pose.position.z = waypoints_[i].second[2];  
@@ -728,7 +727,7 @@ void UAV_gui::updateListWP(){
     void UAV_gui::CallbackState(const std_msgs::UInt8::ConstPtr& _msg){
         bool dataChanged = false;
         unsigned int cpy = _msg->data;
-        if(cpy != stateUAV_){
+        if(cpy != oldData_){
             if(cpy == 1){
                 objectLockState_.lock();
                 stateUAV_ = "WAIT";
@@ -766,6 +765,7 @@ void UAV_gui::updateListWP(){
                 dataChanged = true;
                 std::cout << "Received unrecognized state" << std::endl;
             }
+            oldData_ = cpy;
         }
         
         if(dataChanged){
@@ -775,7 +775,7 @@ void UAV_gui::updateListWP(){
     }
     
     //---------------------------------------------------------------------------------------------------------------------
-    void UAV_gui::CallbackWP(mgui::WaypointData::Request &_req, mgui::WaypointData::Response &_res){
+    bool UAV_gui::CallbackWP(mgui::WaypointData::Request &_req, mgui::WaypointData::Response &_res){
 
         if(_req.req){
             std::cout << "Received WP" << std::endl;
@@ -793,6 +793,8 @@ void UAV_gui::updateListWP(){
             }
         }
         _res.success = true;
+
+        return true;
     }
 
 #endif

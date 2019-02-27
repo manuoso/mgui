@@ -32,15 +32,26 @@
 
 #include <rapidjson/document.h>
 
-#include <fastcom/Subscriber.h>
-#include <fastcom/Publisher.h>
+#ifdef MGUI_USE_FASTCOM
+    #include <fastcom/Subscriber.h>
+    #include <fastcom/Publisher.h>
+#endif
+
+#ifdef MGUI_USE_ROS
+    #include <geometry_msgs/PoseStamped.h>
+    #include <geometry_msgs/TwistStamped.h>
+    #include <std_msgs/String.h>
+    #include <std_msgs/UInt8.h>
+    #include <mgui/WaypointData.h>
+    #include <mgui/CommandData.h>
+    #include <mgui/VelocityData.h>
+#endif
 
 class UAV_receiver
 {
   public:
     /// States of the state machine
-    enum class eState
-    {   
+    enum class eState{   
         WAIT,
         TAKEOFF,
         LAND,
@@ -73,6 +84,19 @@ class UAV_receiver
     /// Run the state machine
     bool run();
 
+  #ifdef MGUI_USE_ROS
+      private:
+        /// Method for receive services with commands in ROS
+        bool CallbackCommand(mgui::CommandData::Request &_req, mgui::CommandData::Response &_res);
+
+        /// Method for receive services with waypoints in ROS
+        bool CallbackWP(mgui::WaypointData::Request &_req, mgui::WaypointData::Response &_res);
+
+        /// Method for receive services with velocity in ROS
+        bool CallbackVelocity(mgui::VelocityData::Request &_req, mgui::VelocityData::Response &_res);
+
+  #endif
+
   private:
     eState state_;
 
@@ -80,11 +104,18 @@ class UAV_receiver
 
     grvc::ual::UAL *ual_;
 
-    fastcom::Subscriber<command> *subsCommand_ = nullptr;
-    fastcom::Publisher<int> *pubState_ = nullptr;
-    fastcom::Publisher<pose> *pubPose_ = nullptr;
-    fastcom::Publisher<pose> *pubVel_ = nullptr;
-    fastcom::Publisher<int> *pubCheck_ = nullptr;
+    #ifdef MGUI_USE_FASTCOM
+        fastcom::Subscriber<command> *subsCommand_ = nullptr;
+        fastcom::Publisher<int> *pubState_ = nullptr;
+        fastcom::Publisher<pose> *pubPose_ = nullptr;
+        fastcom::Publisher<pose> *pubVel_ = nullptr;
+        fastcom::Publisher<int> *pubCheck_ = nullptr;
+    #endif
+
+    #ifdef MGUI_USE_ROS
+        ros::Publisher posePub_, velPub_, statePub;
+        ros::ServiceServer commandSrvRec_, positionSrvRec_, velocitySrvRec_;
+    #endif
 
     float height_, x_, y_, z_; 
 

@@ -22,6 +22,10 @@
 #include <mgui/guis/pclviewer_gui.h>
 #include <QApplication>
 
+#ifdef MGUI_USE_ROS
+    #include <ros/ros.h>
+#endif
+
 int main(int _argc, char** _argv) {
 	
     if (_argc != 2) {
@@ -29,6 +33,12 @@ int main(int _argc, char** _argv) {
         return -1;
     }
 
+    #ifdef MGUI_USE_ROS
+        ros::init(_argc, _argv, "pclgui");
+        ros::AsyncSpinner rosSpinner(4);
+        rosSpinner.start();
+    #endif
+    
     QApplication a(_argc, _argv);
 
     PCLViewer_gui gui;

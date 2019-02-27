@@ -51,48 +51,70 @@ bool UAV_receiver::init(int _argc, char**_argv) {
     int portVel = configFile_["portVel"].GetInt();
     int portCheck = configFile_["portCheck"].GetInt();
 
+    std::string nameCallbackPose = configFile_["callback_pose"].GetString();
+    std::string nameCallbackVel = configFile_["callback_vel"].GetString();
+    std::string nameCallbackState = configFile_["callback_state"].GetString();
+    std::string nameCommandSrv = configFile_["command_srv"].GetString();
+    std::string namePositionSrv = configFile_["position_srv"].GetString();
+    std::string nameVelocitySrv = configFile_["velocity_srv"].GetString();
+
     // Init UAV controller
     ual_ = new grvc::ual::UAL(_argc, _argv);
     std::cout << "UAL initialized" << std::endl;
 
-    // Initialize Fastcom publishers and subscribers
-    subsCommand_ = new fastcom::Subscriber<command>(ip, portCommand);
-    pubState_ = new fastcom::Publisher<int>(portState);
-    pubPose_ = new fastcom::Publisher<pose>(portPose);
-    pubVel_ = new fastcom::Publisher<pose>(portVel);
-    pubCheck_ = new fastcom::Publisher<int>(portCheck);
+    #ifdef MGUI_USE_FASTCOM
+        // Initialize Fastcom publishers and subscribers
+        subsCommand_ = new fastcom::Subscriber<command>(ip, portCommand);
+        pubState_ = new fastcom::Publisher<int>(portState);
+        pubPose_ = new fastcom::Publisher<pose>(portPose);
+        pubVel_ = new fastcom::Publisher<pose>(portVel);
+        pubCheck_ = new fastcom::Publisher<int>(portCheck);
 
-    // Callback of received commands
-    //std::cout << "Commands callback" << std::endl;
-    subsCommand_->attachCallback([&](const command &_data){
-        if(_data.type == 1){
-            state_ = eState::WAIT;
-        }else if(_data.type == 2){
-            state_ = eState::TAKEOFF;
-            height_ = _data.height;
-        }else if(_data.type == 3){
-            state_ = eState::LAND;
-        }else if(_data.type == 4){
-            state_ = eState::MOVE;
-            secureLock_.lock();
-            x_ = _data.x;
-            y_ = _data.y;
-            z_ = _data.z;
-            secureLock_.unlock();
-        }else if(_data.type == 5){
-            state_ = eState::MOVE_VEL;
-            secureLock_.lock();
-            x_ = _data.x;
-            y_ = _data.y;
-            z_ = _data.z;
-            secureLock_.unlock();
-        }else if(_data.type == 6){
-            state_ = eState::EXIT;
-        }else{
-            std::cout << "Unrecognized command state" << std::endl;
-            state_ = eState::WAIT;
-        }
-    });
+        // Callback of received commands
+        //std::cout << "Commands callback" << std::endl;
+        subsCommand_->attachCallback([&](const command &_data){
+            if(_data.type == 1){
+                state_ = eState::WAIT;
+            }else if(_data.type == 2){
+                state_ = eState::TAKEOFF;
+                height_ = _data.height;
+            }else if(_data.type == 3){
+                state_ = eState::LAND;
+            }else if(_data.type == 4){
+                state_ = eState::MOVE;
+                secureLock_.lock();
+                x_ = _data.x;
+                y_ = _data.y;
+                z_ = _data.z;
+                secureLock_.unlock();
+            }else if(_data.type == 5){
+                state_ = eState::MOVE_VEL;
+                secureLock_.lock();
+                x_ = _data.x;
+                y_ = _data.y;
+                z_ = _data.z;
+                secureLock_.unlock();
+            }else if(_data.type == 6){
+                state_ = eState::EXIT;
+            }else{
+                std::cout << "Unrecognized command state" << std::endl;
+                state_ = eState::WAIT;
+            }
+        });
+
+    #endif
+
+    #ifdef MGUI_USE_ROS
+        ros::NodeHandle nh;
+        posePub_ = nh.advertise<geometry_msgs::PoseStamped>(nameCallbackPose, 1);
+        velPub_ = nh.advertise<geometry_msgs::TwistStamped>(nameCallbackVel, 1);
+        statePub = nh.advertise<std_msgs::UInt8>(nameCallbackState, 1);
+
+        commandSrvRec_ = nh.advertiseService(nameCommandSrv, &UAV_receiver::CallbackCommand, this); 
+        positionSrvRec_ = nh.advertiseService(namePositionSrv, &UAV_receiver::CallbackWP, this); 
+        velocitySrvRec_ = nh.advertiseService(nameVelocitySrv, &UAV_receiver::CallbackVelocity, this);  
+
+    #endif
 
     // Publisher State thread
     //std::cout << "State publisher thread" << std::endl;
@@ -119,7 +141,16 @@ bool UAV_receiver::init(int _argc, char**_argv) {
                     msg = 6;
                     break;
             }
-            pubState_->publish(msg);
+            #ifdef MGUI_USE_FASTCOM
+                pubState_->publish(msg);
+            #endif
+            
+            #ifdef MGUI_USE_ROS
+                std_msgs::UInt8 msgROS;
+                msgROS.data = msg;
+                statePub.publish(msgROS);
+            #endif
+
             std::this_thread::sleep_for(std::chrono::milliseconds(50));
         }
     });
@@ -134,7 +165,19 @@ bool UAV_receiver::init(int _argc, char**_argv) {
             sendPose.x = p.pose.position.x;
             sendPose.y = p.pose.position.y;
             sendPose.z = p.pose.position.z;
-            pubPose_->publish(sendPose);
+
+            #ifdef MGUI_USE_FASTCOM
+                pubPose_->publish(sendPose);
+            #endif
+            
+            #ifdef MGUI_USE_ROS
+                geometry_msgs::PoseStamped msgROS;
+                msgROS.pose.position.x = sendPose.x;
+                msgROS.pose.position.y = sendPose.y;
+                msgROS.pose.position.z = sendPose.z;
+                posePub_.publish(msgROS);
+            #endif
+            
             std::this_thread::sleep_for(std::chrono::milliseconds(30));
         }
     });
@@ -149,7 +192,19 @@ bool UAV_receiver::init(int _argc, char**_argv) {
             sendVel.x = v.twist.linear.x;
             sendVel.y = v.twist.linear.y;
             sendVel.z = v.twist.linear.z;
-            pubVel_->publish(sendVel);
+
+            #ifdef MGUI_USE_FASTCOM
+                pubVel_->publish(sendVel);
+            #endif
+            
+            #ifdef MGUI_USE_ROS
+                geometry_msgs::TwistStamped msgROS;
+                msgROS.twist.linear.x = sendVel.x;
+                msgROS.twist.linear.y = sendVel.y;
+                msgROS.twist.linear.z = sendVel.z;
+                velPub_.publish(msgROS);
+            #endif
+
             std::this_thread::sleep_for(std::chrono::milliseconds(30));
         }
     });
@@ -196,9 +251,15 @@ bool UAV_receiver::run() {
                 waypoint.pose.orientation.w = 1;
                 secureLock_.unlock();
                 ual_->goToWaypoint(waypoint);
+
+                #ifdef MGUI_USE_FASTCOM
+                    int check = 1;
+                    pubCheck_->publish(check);
+                #endif
+
+                // 666 TODO: FIX THIS
                 std::this_thread::sleep_for(std::chrono::milliseconds(1000)); 
-                int check = 1;
-                pubCheck_->publish(check);
+                
                 state_ = eState::WAIT;
                 break;
             }
@@ -212,7 +273,15 @@ bool UAV_receiver::run() {
                 velocity.twist.linear.z = z_;
                 secureLock_.unlock();
                 ual_->setVelocity(velocity);
-                state_ = eState::WAIT;
+
+                #ifdef MGUI_USE_FASTCOM
+                    state_ = eState::WAIT;
+                #endif
+
+                #ifdef MGUI_USE_ROS
+                    std::this_thread::sleep_for(std::chrono::milliseconds(30));
+                #endif
+                
                 break;
             }
             case eState::EXIT:
@@ -230,3 +299,82 @@ bool UAV_receiver::run() {
 
     return false;
 }
+
+//---------------------------------------------------------------------------------------------------------------------
+#ifdef MGUI_USE_ROS
+    bool UAV_receiver::CallbackCommand(mgui::CommandData::Request &_req, mgui::CommandData::Response &_res){
+        
+        if(_req.req){
+            if(_req.type == 1){
+                state_ = eState::WAIT;
+                _res.success = true;
+            }else if(_req.type == 2){
+                state_ = eState::TAKEOFF;
+                height_ = _req.height;
+                _res.success = true;
+            }else if(_req.type == 3){
+                state_ = eState::LAND;
+                _res.success = true;
+            }else if(_req.type == 4){
+                std::cout << "Not implemented in Commands, use position service!" << std::endl;
+                state_ = eState::WAIT;
+                _res.success = true;
+            }else if(_req.type == 5){
+                std::cout << "Not implemented in Commands, use velocity service!" << std::endl;
+                state_ = eState::WAIT;
+                _res.success = true;
+            }else if(_req.type == 6){
+                state_ = eState::EXIT;
+                _res.success = true;
+            }else{
+                std::cout << "Unrecognized command state" << std::endl;
+                state_ = eState::WAIT;
+                _res.success = false;
+            }
+        }
+        return true;
+    }
+
+    //---------------------------------------------------------------------------------------------------------------------
+    bool UAV_receiver::CallbackWP(mgui::WaypointData::Request &_req, mgui::WaypointData::Response &_res){
+
+        if(_req.req){
+            state_ = eState::MOVE;
+            secureLock_.lock();
+            x_ = _req.poseWP.pose.position.x;
+            y_ = _req.poseWP.pose.position.y;
+            z_ = _req.poseWP.pose.position.z;
+            secureLock_.unlock();
+        }
+
+        _res.success = true;
+
+        return true;
+    }
+
+    //---------------------------------------------------------------------------------------------------------------------
+    bool UAV_receiver::CallbackVelocity(mgui::VelocityData::Request &_req, mgui::VelocityData::Response &_res){
+
+        if(_req.req){
+            if(_req.continually){
+                state_ = eState::MOVE_VEL;
+                secureLock_.lock();
+                x_ = _req.velocity.twist.linear.x;
+                y_ = _req.velocity.twist.linear.y;
+                z_ = _req.velocity.twist.linear.z;
+                secureLock_.unlock();
+            }else{
+                state_ = eState::WAIT;
+                secureLock_.lock();
+                x_ = 0;
+                y_ = 0;
+                z_ = 0;
+                secureLock_.unlock();
+            }
+        }
+
+        _res.success = true;
+
+        return true;
+    }
+#endif

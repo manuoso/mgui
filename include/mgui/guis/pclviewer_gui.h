@@ -208,7 +208,7 @@ private:
     std::vector<std::pair<int, std::vector<double>>> waypoints_;
 
     int idTray_ = 0;
-    std::vector<std::pair<int, std::vector<double>>> trayectory_;
+    std::vector<std::pair<int, std::vector<double>>> trajectory_;
     
     float poseX_ = 0.0, poseY_ = 0.0, poseZ_ = 0.0, poseOX_ = 0.0, poseOY_ = 0.0, poseOZ_ = 0.0, poseOW_ = 1.0;
     float leicaX_ = 0.0, leicaY_ = 0.0, leicaZ_ = 0.0;

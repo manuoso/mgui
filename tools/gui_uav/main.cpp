@@ -22,12 +22,22 @@
 #include <mgui/guis/uav_gui.h>
 #include <QApplication>
 
+#ifdef MGUI_USE_ROS
+    #include <ros/ros.h>
+#endif
+
 int main(int _argc, char** _argv) {
 	
     if (_argc != 2) {
         std::cout << "Bad input arguments, please provide only the path of a json config file with the structure detailed in the documentation" << std::endl;
         return -1;
     }
+
+    #ifdef MGUI_USE_ROS
+        ros::init(_argc, _argv, "uavgui");
+        ros::AsyncSpinner rosSpinner(4);
+        rosSpinner.start();
+    #endif
 
     QApplication a(_argc, _argv);
 

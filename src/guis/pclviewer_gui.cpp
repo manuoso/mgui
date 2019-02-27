@@ -197,6 +197,9 @@ void PCLViewer_gui::addWaypoint(){
 //---------------------------------------------------------------------------------------------------------------------
 void PCLViewer_gui::run_generateTray(){
 
+    // Clear trajectory vector
+    trajectory_.clear();
+
     trajThread_ = std::thread([&](){
         // motion_planner
         if(typePoint_ == "PointXYZ"){
@@ -299,7 +302,7 @@ void PCLViewer_gui::run_generateTray(){
                     contSpheres_++;
 
                     std::vector<double> pTray = {newTarget[0], newTarget[1], newTarget[2]};
-                    trayectory_.push_back(std::make_pair(idTray_, pTray));
+                    trajectory_.push_back(std::make_pair(idTray_, pTray));
                     idTray_++;
                 }
                 for(unsigned i = 0; i < targetPoints.size(); i++){
@@ -381,7 +384,7 @@ void PCLViewer_gui::run_generateTray(){
                             auto p = spl.eval_f(1.0 / nPoints* i );
 
                             //std::vector<double> pTray = {p[0], p[1], p[2]};
-                            //trayectory_.push_back(std::make_pair(idTray_, pTray));
+                            //trajectory_.push_back(std::make_pair(idTray_, pTray));
                             //idTray_++;
 
                             std::string stringTray = std::to_string(p[0]) + " " + std::to_string(p[1]) + " " + std::to_string(p[2]);
@@ -402,7 +405,7 @@ void PCLViewer_gui::run_generateTray(){
                     }else{
                         for(unsigned i = 0; i <  points.size(); i++){
                             //std::vector<double> pTray = {points[i][0], points[i][1], points[i][2]};
-                            //trayectory_.push_back(std::make_pair(idTray_, pTray));
+                            //trajectory_.push_back(std::make_pair(idTray_, pTray));
                             //idTray_++;
 
                             std::string stringTray = std::to_string(points[i][0]) + " " + std::to_string(points[i][1]) + " " + std::to_string(points[i][2]);
@@ -439,11 +442,11 @@ void PCLViewer_gui::run_generateTray(){
 void PCLViewer_gui::run_sendMision(){
 
     #ifdef MGUI_USE_FASTCOM
-        for(unsigned i = 0; i < trayectory_.size(); i++){
+        for(unsigned i = 0; i < trajectory_.size(); i++){
             pose msg;
-            msg.x = trayectory_[i].second[0];
-            msg.y = trayectory_[i].second[1];
-            msg.z = trayectory_[i].second[2];
+            msg.x = trajectory_[i].second[0];
+            msg.y = trajectory_[i].second[1];
+            msg.z = trajectory_[i].second[2];
             pubWP_->publish(msg);
             std::this_thread::sleep_for(std::chrono::milliseconds(100)); 
         }
@@ -462,12 +465,12 @@ void PCLViewer_gui::run_sendMision(){
         mgui::WaypointData srv;
         srv.request.req = true;
 
-        for(unsigned i = 0; i < trayectory_.size(); i++){
+        for(unsigned i = 0; i < trajectory_.size(); i++){
             srv.request.poseWP.header.stamp = ros::Time::now();
-            srv.request.poseWP.header.frame_id = "wp";
-            srv.request.poseWP.pose.position.x = trayectory_[i].second[0];
-            srv.request.poseWP.pose.position.y = trayectory_[i].second[1];
-            srv.request.poseWP.pose.position.z = trayectory_[i].second[2];  
+            srv.request.poseWP.header.frame_id = "map";
+            srv.request.poseWP.pose.position.x = trajectory_[i].second[0];
+            srv.request.poseWP.pose.position.y = trajectory_[i].second[1];
+            srv.request.poseWP.pose.position.z = trajectory_[i].second[2];  
             srv.request.poseWP.pose.orientation.x = 0; 
             srv.request.poseWP.pose.orientation.y = 0; 
             srv.request.poseWP.pose.orientation.z = 0;  
