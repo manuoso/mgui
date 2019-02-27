@@ -72,16 +72,20 @@ endif()
 #########################################
 ## Load PCL
 if(${USE_GUI})
-	# 666 TODO: FIX THIS FOR PCL 1.9
-	find_package(PCL 1.9 QUIET REQUIRED)
-	#if(${PCL_FOUND} AND ${VTK_FOUND} AND ${Boost_FOUND} AND ${FLANN_FOUND} STREQUAL "TRUE")
+	find_package(PCL QUIET REQUIRED)
+	if(${PCL_FOUND})
 		MESSAGE( STATUS "Adding properly PCL and its dependencies")
 		add_definitions(-DENABLE_PCL)
 		add_definitions(${PCL_DEFINITIONS})
 		list(APPEND MGUI_DEFINITIONS "MGUI_USE_PCL")
-	#else()
-	#	MESSAGE( FATAL_ERROR "Couldnt Add PCL and/or it's dependencies")
-	#endif()
+		if(${PCL_VERSION} VERSION_GREATER 1.9)
+			list(APPEND MGUI_DEFINITIONS "HAS_PCL_1_9")
+		else()
+			list(APPEND MGUI_DEFINITIONS "HAS_PCL_1_8")
+		endif()
+	else()
+		MESSAGE( FATAL_ERROR "Couldnt Add PCL and/or it's dependencies")
+	endif()
 endif(${USE_GUI})
 
 #########################################
