@@ -72,7 +72,7 @@ endif()
 #########################################
 ## Load PCL
 if(${USE_GUI})
-	find_package(PCL QUIET REQUIRED)
+	find_package(PCL 1.8 QUIET REQUIRED)
 	if(${PCL_FOUND})
 		MESSAGE( STATUS "Adding properly PCL and its dependencies")
 		add_definitions(-DENABLE_PCL)
@@ -91,7 +91,7 @@ endif(${USE_GUI})
 #########################################
 ## Load Marble
 if(${USE_GUI})
-	find_package(Marble REQUIRED)
+	find_package(Marble REQUIRED HINTS /usr/local/share/marble/cmake)
 	list(APPEND MGUI_DEFINITIONS "MGUI_USE_MARBLE")
 endif(${USE_GUI})
 
