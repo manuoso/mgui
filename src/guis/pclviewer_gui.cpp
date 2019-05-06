@@ -315,7 +315,7 @@ void PCLViewer_gui::run_generateTray(){
                                             targetPoints[i][0], targetPoints[i][1], targetPoints[i][2]);
                     }else{
                         planner.initPoint({targetPoints[i-1][0], targetPoints[i-1][1], targetPoints[i-1][2]});
-                        planner.dimensions( targetPoints[i-1][0], targetPoints[i-1][0], targetPoints[i-1][0],
+                        planner.dimensions( targetPoints[i-1][0], targetPoints[i-1][1], targetPoints[i-1][2],
                                             targetPoints[i][0], targetPoints[i][1], targetPoints[i][2]);
                     }
                     planner.targetPoint({targetPoints[i][0], targetPoints[i][1], targetPoints[i][2]});
@@ -330,7 +330,7 @@ void PCLViewer_gui::run_generateTray(){
                     //planner.addConstraint(c2);
 
                     // Compute traj
-                    std::normal_distribution<> gaussianX{targetPoints[i][0],1.5};
+                    /*std::normal_distribution<> gaussianX{targetPoints[i][0],1.5};
                     std::normal_distribution<> gaussianY{targetPoints[i][1],1.5};
                     std::normal_distribution<> gaussianZ{targetPoints[i][2],1.5};
                     planner.samplerFunction([&](){
@@ -339,7 +339,7 @@ void PCLViewer_gui::run_generateTray(){
                             gaussianY(gen),
                             gaussianZ(gen)
                         });
-                    });
+                    });*/
                     auto traj = planner.compute();
                     planner.tree(nodes, nodesInfo);
 
