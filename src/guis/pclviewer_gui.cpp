@@ -78,6 +78,7 @@ bool PCLViewer_gui::configureGUI(int _argc, char **_argv)
     convertAndSave_ = configFile_["save_pcd_ply"].GetBool();
     drawTrajectory_ = configFile_["draw_complete_tree"].GetBool();
     safeDistance_ = configFile_["safe_distance"].GetDouble();
+    stepSize_ = configFile_["step_size"].GetDouble();
     appPointDistance_ = configFile_["app_point_distance"].GetDouble();
     
     usePCD_ = configFile_["use_pcd"].GetBool();
@@ -307,7 +308,7 @@ void PCLViewer_gui::run_generateTray(){
                 }
                 for(unsigned i = 0; i < targetPoints.size(); i++){
                     // Config planner
-                    mp::RRTStar planner;
+                    mp::RRTStar planner(stepSize_);
                     if(i == 0){
                         planner.initPoint({poseX_, poseY_, poseZ_});
                         planner.dimensions( poseX_, poseY_, poseZ_,

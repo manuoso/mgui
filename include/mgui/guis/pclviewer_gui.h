@@ -197,6 +197,7 @@ private:
 
     float safeDistance_ = 0.5;
     float appPointDistance_ = 0.5;
+    float stepSize_ = 0.1;
     bool drawTrajectory_ = false;
     int iterations_ = 0;
     int contSpheres_ = 0;
