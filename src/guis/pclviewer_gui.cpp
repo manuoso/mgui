@@ -377,7 +377,7 @@ void PCLViewer_gui::drawTrajectory(const std::vector<Eigen::Vector3f> &_points, 
 
     covisibilityNodesTraj = vtkSmartPointer<vtkPoints>::New();
 
-    if(useSpline_){
+    if(useSpline_ && _points.size() > 20){
         Spline<Eigen::Vector3f, float> spl(20);
         spl.set_ctrl_points(_points);
         int nPoints = _points.size()*10;
