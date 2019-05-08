@@ -262,13 +262,13 @@ void PCLViewer_gui::initPlannerVariables(){
     };
     mp::Constraint c2 = [&](const Eigen::Vector3f & _old, const Eigen::Vector3f &_new){
         pcl::octree::OctreePointCloudSearch<pcl::PointXYZRGB>::AlignedPointTVector intersections;
-        octree_.getIntersectedVoxelCenters({leicaX_, leicaY_, leicaZ_}, {_old[0]-leicaX_, _old[1]-leicaY_, _old[2]-leicaZ_}, intersections);
+        octree_.getIntersectedVoxelCenters({_old[0], _old[1], _old[2]}, {leicaX_-_old[0], leicaY_-_old[1], leicaZ_-_old[2]}, intersections);
         
         return intersections.size() == 0;
     };
 
     constraints_.push_back(c1);
-    //constraints_.push_back(c2);
+    constraints_.push_back(c2);
 }
 
 //---------------------------------------------------------------------------------------------------------------------
