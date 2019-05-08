@@ -455,12 +455,12 @@ void PCLViewer_gui::buildGraphCosts(    std::vector<std::vector<float>> _targetP
                 planner.initPoint({_targetPoints[_i][0], _targetPoints[_i][1], _targetPoints[_i][2]});
                 planner.targetPoint({_targetPoints[_j][0], _targetPoints[_j][1], _targetPoints[_j][2]});
                 
-                float minx = std::min(_targetPoints[_i][0], _targetPoints[_j][0]); //minx = minx<0?minx*1.4: minx*0.6;
-                float miny = std::min(_targetPoints[_i][1], _targetPoints[_j][1]); //miny = miny<0?miny*1.4: miny*0.6;
-                float minz = std::min(_targetPoints[_i][2], _targetPoints[_j][2]); //minz = minz<0?minz*1.4: minz*0.6;
-                float maxx = std::max(_targetPoints[_i][0], _targetPoints[_j][0]); //maxx = maxx<0?maxx*0.6: maxx*1.4;
-                float maxy = std::max(_targetPoints[_i][1], _targetPoints[_j][1]); //maxy = maxy<0?maxy*0.6: maxy*1.4;
-                float maxz = std::max(_targetPoints[_i][2], _targetPoints[_j][2]); //maxz = maxz<0?maxz*0.6: maxz*1.4;
+                float minx = std::min(_targetPoints[_i][0], _targetPoints[_j][0]); minx = minx<0?minx*1.4: minx*0.6;
+                float miny = std::min(_targetPoints[_i][1], _targetPoints[_j][1]); miny = miny<0?miny*1.4: miny*0.6;
+                float minz = std::min(_targetPoints[_i][2], _targetPoints[_j][2]); minz = minz<0?minz*1.4: minz*0.6;
+                float maxx = std::max(_targetPoints[_i][0], _targetPoints[_j][0]); maxx = maxx<0?maxx*0.6: maxx*1.4;
+                float maxy = std::max(_targetPoints[_i][1], _targetPoints[_j][1]); maxy = maxy<0?maxy*0.6: maxy*1.4;
+                float maxz = std::max(_targetPoints[_i][2], _targetPoints[_j][2]); maxz = maxz<0?maxz*0.6: maxz*1.4;
 
                 planner.dimensions( minx, miny, minz, maxx, maxy, maxz);
                 
