@@ -439,43 +439,65 @@ void PCLViewer_gui::buildGraphCosts(    std::vector<std::vector<float>> _targetP
                                         std::map<unsigned, std::map<unsigned, mp::Trajectory>> &_trajectories){
     _graph = Eigen::MatrixXf::Zero(_targetPoints.size(), _targetPoints.size());
 
+    std::mutex counterGuard;
+    int finishedWorks = 0;
+    int launchedWorks = 0;
+
     for(unsigned i = 0; i < _targetPoints.size(); i++){
         for(unsigned j = i+1; j < _targetPoints.size(); j++){
-            mp::RRTStar planner(stepSize_);
-            planner.initPoint({_targetPoints[i][0], _targetPoints[i][1], _targetPoints[i][2]});
-            planner.targetPoint({_targetPoints[j][0], _targetPoints[j][1], _targetPoints[j][2]});
+            launchedWorks++;
+            std::thread worker([&](int _i, int _j){
+                std::stringstream ss;
+                ss << "Started worker: " << _i << ", " << _j << std::endl;
+                std::cout << ss.str();
+
+                mp::RRTStar planner(stepSize_);
+                planner.initPoint({_targetPoints[_i][0], _targetPoints[_i][1], _targetPoints[_i][2]});
+                planner.targetPoint({_targetPoints[_j][0], _targetPoints[_j][1], _targetPoints[_j][2]});
+                
+                float minx = std::min(_targetPoints[_i][0], _targetPoints[_j][0]); //minx = minx<0?minx*1.4: minx*0.6;
+                float miny = std::min(_targetPoints[_i][1], _targetPoints[_j][1]); //miny = miny<0?miny*1.4: miny*0.6;
+                float minz = std::min(_targetPoints[_i][2], _targetPoints[_j][2]); //minz = minz<0?minz*1.4: minz*0.6;
+                float maxx = std::max(_targetPoints[_i][0], _targetPoints[_j][0]); //maxx = maxx<0?maxx*0.6: maxx*1.4;
+                float maxy = std::max(_targetPoints[_i][1], _targetPoints[_j][1]); //maxy = maxy<0?maxy*0.6: maxy*1.4;
+                float maxz = std::max(_targetPoints[_i][2], _targetPoints[_j][2]); //maxz = maxz<0?maxz*0.6: maxz*1.4;
+
+                planner.dimensions( minx, miny, minz, maxx, maxy, maxz);
+                
+                planner.iterations(iterations_);
+                for(auto &c:constraints_){
+                    planner.addConstraint(c);
+                }
+
+                auto traj = planner.compute();
+                // planner.tree(nodes, nodesInfo);
+                if(traj.distance() == 0){
+                    _graph(_i,_j) = std::numeric_limits<float>::max();
+                    _graph(_j,_i) = std::numeric_limits<float>::max();
+                } else{
+                    _graph(_i,_j) = traj.distance();
+                    _graph(_j,_i) = _graph(_i,_j);
+                } 
+
+                counterGuard.lock();
+                _trajectories[_i][_j] = traj;
+                _trajectories[_j][_i] = traj;
+                finishedWorks++;
+                counterGuard.unlock();
+
+                std::cout << "Prepared trajectory between points " << _i << " and " << _j << ". Dist: " << traj.distance() << std::endl;
+            }, i, j);
+
+            worker.detach();
             
-            float minx = std::min(_targetPoints[i][0], _targetPoints[j][0]); //minx = minx<0?minx*1.4: minx*0.6;
-            float miny = std::min(_targetPoints[i][1], _targetPoints[j][1]); //miny = miny<0?miny*1.4: miny*0.6;
-            float minz = std::min(_targetPoints[i][2], _targetPoints[j][2]); //minz = minz<0?minz*1.4: minz*0.6;
-            float maxx = std::max(_targetPoints[i][0], _targetPoints[j][0]); //maxx = maxx<0?maxx*0.6: maxx*1.4;
-            float maxy = std::max(_targetPoints[i][1], _targetPoints[j][1]); //maxy = maxy<0?maxy*0.6: maxy*1.4;
-            float maxz = std::max(_targetPoints[i][2], _targetPoints[j][2]); //maxz = maxz<0?maxz*0.6: maxz*1.4;
-
-            planner.dimensions( minx, miny, minz, maxx, maxy, maxz);
-            
-            planner.iterations(iterations_);
-            for(auto &c:constraints_){
-                planner.addConstraint(c);
-            }
-
-            auto traj = planner.compute();
-            // planner.tree(nodes, nodesInfo);
-            if(traj.distance() == 0){
-                _graph(i,j) = std::numeric_limits<float>::max();
-                _graph(j,i) = std::numeric_limits<float>::max();
-            } else{
-                _graph(i,j) = traj.distance();
-                _graph(j,i) = _graph(i,j);
-            } 
-            _trajectories[i][j] = traj;
-            _trajectories[j][i] = traj;
-            std::cout << "Preparing trajectory between points " << i << " and " << j << ". Dist: " << traj.distance() << std::endl;
-
             // drawTrajectory(traj.points(), "test_traj");
             // std::this_thread::sleep_for(std::chrono::seconds(5));
             // deleteTrajectory("test_traj");
         }   
+    }
+
+    while(finishedWorks != launchedWorks){
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
 
 }
