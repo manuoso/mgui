@@ -25,6 +25,8 @@
 #include <pcl/features/normal_3d.h>
 #include <random>
 
+#include <motion_planning/planners/tsp.h>
+
 //---------------------------------------------------------------------------------------------------------------------
 // PUBLIC 
 //---------------------------------------------------------------------------------------------------------------------
@@ -32,7 +34,8 @@
 //---------------------------------------------------------------------------------------------------------------------
 PCLViewer_gui::PCLViewer_gui(QWidget *parent) :
     QMainWindow(parent),
-    ui(new Ui::PCLViewer_gui)
+    ui(new Ui::PCLViewer_gui),
+    octree_(0.05)
     {
 
     ui->setupUi(this);
@@ -161,6 +164,8 @@ bool PCLViewer_gui::configureGUI(int _argc, char **_argv)
         });
     #endif
     
+    initPlannerVariables();
+
     LogTray::init("Trajectory_" + std::to_string(time(NULL)));
 
     return true;
@@ -197,7 +202,6 @@ void PCLViewer_gui::addWaypoint(){
 
 //---------------------------------------------------------------------------------------------------------------------
 void PCLViewer_gui::run_generateTray(){
-
     // Clear trajectory vector
     trajectory_.clear();
 
@@ -209,234 +213,271 @@ void PCLViewer_gui::run_generateTray(){
             // Remove previous trayectories if exists
             int oldCont = 0;
             while(oldCont<=cont_ ){
-                viewer_->removeShape("traj_"+std::to_string(oldCont));
-                emit qvtkChanged();
+                deleteTrajectory("traj_"+std::to_string(oldCont));
                 oldCont++;
             }
             cont_ = 0;
 
-            std::random_device rd{};
-            std::mt19937 gen{rd()};
-
             if(waypoints_.size() > 0){
-                // Add constraint
-                pcl::octree::OctreePointCloudSearch<pcl::PointXYZRGB> octree(0.05);
-                octree.setInputCloud(cloudT2_);
-                octree.addPointsFromInputCloud();
-
-                std::vector<mp::RRTStar::NodeInfo> nodesInfo;
-                pcl::PointCloud<pcl::PointXYZ>::Ptr nodes;
-
-                vtkSmartPointer<vtkPolyData> treeBase;
-                vtkSmartPointer<vtkPoints> covisibilityNodes;
-
-                vtkSmartPointer<vtkPolyData> covisibilityGraph;
-                vtkSmartPointer<vtkPoints> covisibilityNodesTraj;
-                vtkSmartPointer<vtkUnsignedCharArray> covisibilityNodeColors;
-
-                // Intantiate constraints
-                mp::Constraint c1 = [&](const Eigen::Vector3f &_orig, const Eigen::Vector3f &_dest){
-                    pcl::PointXYZRGB query;
-                    query.x = _dest[0];
-                    query.y = _dest[1];
-                    query.z = _dest[2];
-                    std::vector<int> index;
-                    std::vector< float > dist;
-                    octree.nearestKSearch(query, 1, index, dist);
-                    
-                    return *std::min_element(dist.begin(), dist.end()) > safeDistance_;
-                };
-                mp::Constraint c2 = [&](const Eigen::Vector3f & _old, const Eigen::Vector3f &_new){
-                    pcl::octree::OctreePointCloudSearch<pcl::PointXYZRGB>::AlignedPointTVector intersections;
-                    octree.getIntersectedVoxelCenters({leicaX_, leicaY_, leicaZ_}, {_old[0]-leicaX_, _old[1]-leicaY_, _old[2]-leicaZ_}, intersections);
-                    
-                    return intersections.size() == 0;
-                };
-
                 // Create approximation points.
-                std::vector<std::vector<float>> targetPoints;
-                for(unsigned i = 0; i < waypoints_.size(); i++){
-                    std::vector<int> pointsIds;
-                    std::vector<float> distances;
-                    pcl::PointXYZRGB p;
-                    p.x = waypoints_[i].second[0];
-                    p.y = waypoints_[i].second[1];
-                    p.z = waypoints_[i].second[2];
+                std::vector<std::vector<float>> targetPoints = computeApproachingPoints(octree_);
+                std::cout<< std::endl << "Computed approaching points" << std::endl;
+                std::map<unsigned, std::map<unsigned, mp::Trajectory>> trajectories;
+                Eigen::MatrixXf graph;
+                buildGraphCosts(targetPoints, graph, trajectories);
+                std::cout << "Built graph costs" << std::endl;
+                std::cout << graph << std::endl;
+                std::vector<int> optimalTrajectory = optimizeTrajectory(graph);
+                std::cout << "Optimized trajectory" << std::endl;
+
+                for(unsigned ti = 1; ti < optimalTrajectory.size(); ti++){
+                    int id0 = optimalTrajectory[ti-1];
+                    int id1 = optimalTrajectory[ti];
+                    auto points = trajectories[id0][id1].points();
                     
-                    octree.radiusSearch(p, 0.15, pointsIds, distances);
-                    Eigen::Vector4f plane_parameters; 
-                    float curvature;
-                    pcl::computePointNormal(*cloudT2_, pointsIds, plane_parameters, curvature);
-
-                    Eigen::Vector3f newTarget = {
-                        p.x + plane_parameters[0]*appPointDistance_*1.1,
-                        p.y + plane_parameters[1]*appPointDistance_*1.1,
-                        p.z + plane_parameters[2]*appPointDistance_*1.1
-                    };
-
-                    if(!c2(newTarget, newTarget) || !c1(newTarget, newTarget)){
-                        newTarget = {
-                            p.x - plane_parameters[0]*appPointDistance_*1.1,
-                            p.y - plane_parameters[1]*appPointDistance_*1.1,
-                            p.z - plane_parameters[2]*appPointDistance_*1.1
-                        };
-                    }
-
-                    targetPoints.push_back({
-                                            newTarget[0],
-                                            newTarget[1],
-                                            newTarget[2]
-                                            });
-
-                    std::string sSphere = "sphere" + std::to_string(contSpheres_);
-                    QString qRadSphere;
-                    qRadSphere = ui->lineEdit_RadSphere->text();
-                    double radSphere;
-                    radSphere = qRadSphere.toDouble(); 
-
-                    viewer_->addSphere(pcl::PointXYZ(
-                                                        newTarget[0],
-                                                        newTarget[1],
-                                                        newTarget[2]
-                                                    ), radSphere, 0, 1, 0, sSphere);
-                    emit qvtkChanged();
-                    contSpheres_++;
-
-                    std::vector<double> pTray = {newTarget[0], newTarget[1], newTarget[2]};
-                    trajectory_.push_back(std::make_pair(idTray_, pTray));
-                    idTray_++;
-                }
-                for(unsigned i = 0; i < targetPoints.size(); i++){
-                    // Config planner
-                    mp::RRTStar planner(stepSize_);
-                    if(i == 0){
-                        planner.initPoint({poseX_, poseY_, poseZ_});
-                        planner.dimensions( poseX_, poseY_, poseZ_,
-                                            targetPoints[i][0], targetPoints[i][1], targetPoints[i][2]);
-                    }else{
-                        planner.initPoint({targetPoints[i-1][0], targetPoints[i-1][1], targetPoints[i-1][2]});
-                        planner.dimensions( targetPoints[i-1][0], targetPoints[i-1][1], targetPoints[i-1][2],
-                                            targetPoints[i][0], targetPoints[i][1], targetPoints[i][2]);
-                    }
-                    planner.targetPoint({targetPoints[i][0], targetPoints[i][1], targetPoints[i][2]});
-                    
-                    // planner.enableDebugVisualization(viz.rawViewer());
-                    planner.iterations(iterations_);
-                    
-                    // 666 TODO: PROBLEMS WHEN HAVE TWO POINTS THAT PRODUCE COLISIONS ON THE BRIDGE
-                    planner.addConstraint(c1);
-
-                    // 666 TODO: CONSTRAINT C2 IS NOT WORKING!!!
-                    //planner.addConstraint(c2);
-
-                    // Compute traj
-                    /*std::normal_distribution<> gaussianX{targetPoints[i][0],1.5};
-                    std::normal_distribution<> gaussianY{targetPoints[i][1],1.5};
-                    std::normal_distribution<> gaussianZ{targetPoints[i][2],1.5};
-                    planner.samplerFunction([&](){
-                        return Eigen::Vector3f({
-                            gaussianX(gen),
-                            gaussianY(gen),
-                            gaussianZ(gen)
-                        });
-                    });*/
-                    auto traj = planner.compute();
-                    planner.tree(nodes, nodesInfo);
-
-                    // Create new graph
-                    treeBase = vtkSmartPointer<vtkPolyData>::New();
-                    treeBase->Allocate();
-                    covisibilityNodes = vtkSmartPointer<vtkPoints>::New();
-
-                    if(drawTrajectory_){
-                        // Fill-up with nodes
-                        for(unsigned i = 0; i <  nodes->size(); i++){
-                            covisibilityNodes->InsertNextPoint(     nodes->points[i].x, 
-                                                                    nodes->points[i].y, 
-                                                                    nodes->points[i].z);
-                            if(i > 0){
-                                vtkIdType connectivity[2];
-                                connectivity[0] = nodesInfo[i].id_;
-                                connectivity[1] = nodesInfo[i].parent_;
-                                treeBase->InsertNextCell(VTK_LINE,2,connectivity);
-                            }
-                        }
-
-                        treeBase->SetPoints(covisibilityNodes);
-                        viewer_->addModelFromPolyData(treeBase, "treeRRT_"+std::to_string(cont_));
-                        emit qvtkChanged();
-                    }
-                    // Create new graph
-                    covisibilityGraph = vtkSmartPointer<vtkPolyData>::New();
-                    covisibilityGraph->Allocate();
-                
-                    covisibilityNodeColors = vtkSmartPointer<vtkUnsignedCharArray>::New();
-                    covisibilityNodeColors->SetNumberOfComponents(3);
-                    covisibilityNodeColors->SetName("Colors");
-
-                    covisibilityNodesTraj = vtkSmartPointer<vtkPoints>::New();
-
-                    auto points = traj.points();
-                    if(useSpline_){
-                        Spline<Eigen::Vector3f, float> spl(20);
-                        spl.set_ctrl_points(points);
-                        int nPoints = points.size()*10;
-                        for(unsigned i = 0; i < nPoints; i++){
-                            auto p = spl.eval_f(1.0 / nPoints* i );
-
-                            //std::vector<double> pTray = {p[0], p[1], p[2]};
-                            //trajectory_.push_back(std::make_pair(idTray_, pTray));
-                            //idTray_++;
-
-                            std::string stringTray = std::to_string(p[0]) + " " + std::to_string(p[1]) + " " + std::to_string(p[2]);
-                            LogTray::get()->message(stringTray, false);
-
-                            const unsigned char green[3] = {0, 255, 0};
-                            covisibilityNodesTraj->InsertNextPoint( p[0], 
-                                                                    p[1], 
-                                                                    p[2]);
-                            covisibilityNodeColors->InsertNextTupleValue(green);
-                            if(i > 0){
-                                vtkIdType connectivity[2];
-                                connectivity[0] = i-1;
-                                connectivity[1] = i;
-                                covisibilityGraph->InsertNextCell(VTK_LINE,2,connectivity);
-                            }
-                        }
-                    }else{
-                        for(unsigned i = 0; i <  points.size(); i++){
-                            //std::vector<double> pTray = {points[i][0], points[i][1], points[i][2]};
-                            //trajectory_.push_back(std::make_pair(idTray_, pTray));
-                            //idTray_++;
-
-                            std::string stringTray = std::to_string(points[i][0]) + " " + std::to_string(points[i][1]) + " " + std::to_string(points[i][2]);
-                            LogTray::get()->message(stringTray, false);
-
-                            const unsigned char green[3] = {0, 255, 0};
-                            covisibilityNodesTraj->InsertNextPoint( points[i][0], 
-                                                                    points[i][1], 
-                                                                    points[i][2]);
-                            covisibilityNodeColors->InsertNextTupleValue(green);
-                            if(i > 0){
-                                vtkIdType connectivity[2];
-                                connectivity[0] = i-1;
-                                connectivity[1] = i;
-                                covisibilityGraph->InsertNextCell(VTK_LINE,2,connectivity);
-                            }
-                        }            
-                    }
-
-                    //std::cout << "Drawing traj " << cont_ << std::endl;
-                    covisibilityGraph->SetPoints(covisibilityNodesTraj);
-                    covisibilityGraph->GetPointData()->SetScalars(covisibilityNodeColors);
-                    viewer_->addModelFromPolyData(covisibilityGraph, "traj_"+std::to_string(cont_));
-                    viewer_->setShapeRenderingProperties(pcl::visualization::PCL_VISUALIZER_LINE_WIDTH, 5, "traj_"+std::to_string(cont_));
+                    drawTrajectory(points, "traj_"+std::to_string(cont_));
                     cont_++;
-                    emit qvtkChanged();
                 }
             }
         }
     });
+}
+
+
+void PCLViewer_gui::initPlannerVariables(){
+    // Add constraint
+    octree_.setInputCloud(cloudT2_);
+    octree_.addPointsFromInputCloud();
+    // Intantiate constraints
+    mp::Constraint c1 = [&](const Eigen::Vector3f &_orig, const Eigen::Vector3f &_dest){
+        pcl::PointXYZRGB query;
+        query.x = _dest[0];
+        query.y = _dest[1];
+        query.z = _dest[2];
+        std::vector<int> index;
+        std::vector< float > dist;
+        octree_.nearestKSearch(query, 1, index, dist);
+        
+        return *std::min_element(dist.begin(), dist.end()) > safeDistance_;
+    };
+    mp::Constraint c2 = [&](const Eigen::Vector3f & _old, const Eigen::Vector3f &_new){
+        pcl::octree::OctreePointCloudSearch<pcl::PointXYZRGB>::AlignedPointTVector intersections;
+        octree_.getIntersectedVoxelCenters({leicaX_, leicaY_, leicaZ_}, {_old[0]-leicaX_, _old[1]-leicaY_, _old[2]-leicaZ_}, intersections);
+        
+        return intersections.size() == 0;
+    };
+
+    constraints_.push_back(c1);
+    //constraints_.push_back(c2);
+}
+
+//---------------------------------------------------------------------------------------------------------------------
+std::vector<std::vector<float>> PCLViewer_gui::computeApproachingPoints(pcl::octree::OctreePointCloudSearch<pcl::PointXYZRGB> &_octree){
+    std::vector<std::vector<float>> targetPoints;
+
+        targetPoints.push_back({
+            poseX_,
+            poseY_,
+            poseZ_
+        });
+
+    for(unsigned i = 0; i < waypoints_.size(); i++){
+        std::vector<int> pointsIds;
+        std::vector<float> distances;
+        pcl::PointXYZRGB p;
+        p.x = waypoints_[i].second[0];
+        p.y = waypoints_[i].second[1];
+        p.z = waypoints_[i].second[2];
+        
+        _octree.radiusSearch(p, 0.15, pointsIds, distances);
+        Eigen::Vector4f plane_parameters; 
+        float curvature;
+        pcl::computePointNormal(*cloudT2_, pointsIds, plane_parameters, curvature);
+
+        Eigen::Vector3f newTarget = {
+            p.x + plane_parameters[0]*appPointDistance_*1.1,
+            p.y + plane_parameters[1]*appPointDistance_*1.1,
+            p.z + plane_parameters[2]*appPointDistance_*1.1
+        };
+
+        for(auto &c:constraints_){
+            if(!c(newTarget, newTarget)){
+                newTarget = {
+                    p.x - plane_parameters[0]*appPointDistance_*1.1,
+                    p.y - plane_parameters[1]*appPointDistance_*1.1,
+                    p.z - plane_parameters[2]*appPointDistance_*1.1
+                };
+                break;
+            }
+        }
+
+        targetPoints.push_back({
+                                newTarget[0],
+                                newTarget[1],
+                                newTarget[2]
+                                });
+
+        std::string sSphere = "sphere" + std::to_string(contSpheres_);
+        QString qRadSphere;
+        qRadSphere = ui->lineEdit_RadSphere->text();
+        double radSphere;
+        radSphere = qRadSphere.toDouble(); 
+
+        viewer_->addSphere(pcl::PointXYZ(
+                                            newTarget[0],
+                                            newTarget[1],
+                                            newTarget[2]
+                                        ), radSphere, 0, 1, 0, sSphere);
+        emit qvtkChanged();
+        contSpheres_++;
+
+        std::vector<double> pTray = {newTarget[0], newTarget[1], newTarget[2]};
+        trajectory_.push_back(std::make_pair(idTray_, pTray));
+        idTray_++;
+    }
+
+    return targetPoints;
+}
+
+//---------------------------------------------------------------------------------------------------------------------
+std::vector<int> PCLViewer_gui::optimizeTrajectory(Eigen::MatrixXf &_graph){
+    mp::TSP tsp(_graph);
+
+    auto traj = tsp.compute();
+    std::vector<int> indices = {0};
+    for(auto &p: traj.points()){
+        indices.push_back((int) p[0]);
+    }
+    indices.push_back(0);
+
+    return indices;
+}
+
+//---------------------------------------------------------------------------------------------------------------------
+void PCLViewer_gui::drawTrajectory(const std::vector<Eigen::Vector3f> &_points, std::string _name){
+    // Variables
+    vtkSmartPointer<vtkPolyData> treeBase;
+    vtkSmartPointer<vtkPoints> covisibilityNodes;
+
+    vtkSmartPointer<vtkPolyData> covisibilityGraph;
+    vtkSmartPointer<vtkPoints> covisibilityNodesTraj;
+    vtkSmartPointer<vtkUnsignedCharArray> covisibilityNodeColors;
+
+    treeBase = vtkSmartPointer<vtkPolyData>::New();
+    treeBase->Allocate();
+    covisibilityNodes = vtkSmartPointer<vtkPoints>::New();
+
+    // Create new graph
+    covisibilityGraph = vtkSmartPointer<vtkPolyData>::New();
+    covisibilityGraph->Allocate();
+
+    covisibilityNodeColors = vtkSmartPointer<vtkUnsignedCharArray>::New();
+    covisibilityNodeColors->SetNumberOfComponents(3);
+    covisibilityNodeColors->SetName("Colors");
+
+    covisibilityNodesTraj = vtkSmartPointer<vtkPoints>::New();
+
+    if(useSpline_){
+        Spline<Eigen::Vector3f, float> spl(20);
+        spl.set_ctrl_points(_points);
+        int nPoints = _points.size()*10;
+        for(unsigned i = 0; i < nPoints; i++){
+            auto p = spl.eval_f(1.0 / nPoints* i );
+
+            std::string stringTray = std::to_string(p[0]) + " " + std::to_string(p[1]) + " " + std::to_string(p[2]);
+            LogTray::get()->message(stringTray, false);
+
+            const unsigned char green[3] = {0, 255, 0};
+            covisibilityNodesTraj->InsertNextPoint( p[0], 
+                                                    p[1], 
+                                                    p[2]);
+            covisibilityNodeColors->InsertNextTupleValue(green);
+            if(i > 0){
+                vtkIdType connectivity[2];
+                connectivity[0] = i-1;
+                connectivity[1] = i;
+                covisibilityGraph->InsertNextCell(VTK_LINE,2,connectivity);
+            }
+        }
+    }else{
+        for(unsigned i = 0; i <  _points.size(); i++){
+
+            std::string stringTray = std::to_string(_points[i][0]) + " " + std::to_string(_points[i][1]) + " " + std::to_string(_points[i][2]);
+            LogTray::get()->message(stringTray, false);
+
+            const unsigned char green[3] = {0, 255, 0};
+            covisibilityNodesTraj->InsertNextPoint( _points[i][0], 
+                                                    _points[i][1], 
+                                                    _points[i][2]);
+            covisibilityNodeColors->InsertNextTupleValue(green);
+            if(i > 0){
+                vtkIdType connectivity[2];
+                connectivity[0] = i-1;
+                connectivity[1] = i;
+                covisibilityGraph->InsertNextCell(VTK_LINE,2,connectivity);
+            }
+        }            
+    }
+
+    //std::cout << "Drawing traj " << cont_ << std::endl;
+    covisibilityGraph->SetPoints(covisibilityNodesTraj);
+    covisibilityGraph->GetPointData()->SetScalars(covisibilityNodeColors);
+    viewer_->addModelFromPolyData(covisibilityGraph, _name);
+    viewer_->setShapeRenderingProperties(pcl::visualization::PCL_VISUALIZER_LINE_WIDTH, 5, _name);
+    emit qvtkChanged();
+}
+
+//---------------------------------------------------------------------------------------------------------------------
+void PCLViewer_gui::deleteTrajectory(std::string _name){
+    viewer_->removeShape(_name);
+    emit qvtkChanged();
+}
+
+//---------------------------------------------------------------------------------------------------------------------
+void PCLViewer_gui::buildGraphCosts(    std::vector<std::vector<float>> _targetPoints, 
+                                        Eigen::MatrixXf &_graph, 
+                                        std::map<unsigned, std::map<unsigned, mp::Trajectory>> &_trajectories){
+    _graph = Eigen::MatrixXf::Zero(_targetPoints.size(), _targetPoints.size());
+
+    for(unsigned i = 0; i < _targetPoints.size(); i++){
+        for(unsigned j = i+1; j < _targetPoints.size(); j++){
+            mp::RRTStar planner(stepSize_);
+            planner.initPoint({_targetPoints[i][0], _targetPoints[i][1], _targetPoints[i][2]});
+            planner.targetPoint({_targetPoints[j][0], _targetPoints[j][1], _targetPoints[j][2]});
+            
+            float minx = std::min(_targetPoints[i][0], _targetPoints[j][0]); //minx = minx<0?minx*1.4: minx*0.6;
+            float miny = std::min(_targetPoints[i][1], _targetPoints[j][1]); //miny = miny<0?miny*1.4: miny*0.6;
+            float minz = std::min(_targetPoints[i][2], _targetPoints[j][2]); //minz = minz<0?minz*1.4: minz*0.6;
+            float maxx = std::max(_targetPoints[i][0], _targetPoints[j][0]); //maxx = maxx<0?maxx*0.6: maxx*1.4;
+            float maxy = std::max(_targetPoints[i][1], _targetPoints[j][1]); //maxy = maxy<0?maxy*0.6: maxy*1.4;
+            float maxz = std::max(_targetPoints[i][2], _targetPoints[j][2]); //maxz = maxz<0?maxz*0.6: maxz*1.4;
+
+            planner.dimensions( minx, miny, minz, maxx, maxy, maxz);
+            
+            planner.iterations(iterations_);
+            for(auto &c:constraints_){
+                planner.addConstraint(c);
+            }
+
+            auto traj = planner.compute();
+            // planner.tree(nodes, nodesInfo);
+            if(traj.distance() == 0){
+                _graph(i,j) = std::numeric_limits<float>::max();
+                _graph(j,i) = std::numeric_limits<float>::max();
+            } else{
+                _graph(i,j) = traj.distance();
+                _graph(j,i) = _graph(i,j);
+            } 
+            _trajectories[i][j] = traj;
+            _trajectories[j][i] = traj;
+            std::cout << "Preparing trajectory between points " << i << " and " << j << ". Dist: " << traj.distance() << std::endl;
+
+            // drawTrajectory(traj.points(), "test_traj");
+            // std::this_thread::sleep_for(std::chrono::seconds(5));
+            // deleteTrajectory("test_traj");
+        }   
+    }
+
 }
 
 //---------------------------------------------------------------------------------------------------------------------

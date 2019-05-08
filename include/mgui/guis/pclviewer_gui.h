@@ -156,10 +156,22 @@ private:
     /// \return the size of the vector that contains the extracted information
     size_t split(const std::string &txt, std::vector<std::string> &strs, char ch);
 
+
+    void initPlannerVariables();
+    std::vector<std::vector<float>> computeApproachingPoints(pcl::octree::OctreePointCloudSearch<pcl::PointXYZRGB> &_octree);
+    void buildGraphCosts(std::vector<std::vector<float>> _targetPoints, Eigen::MatrixXf &_graph, std::map<unsigned, std::map<unsigned, mp::Trajectory>> &_trajectories);
+    std::vector<int> optimizeTrajectory(Eigen::MatrixXf &_graph);
+
+    void drawTrajectory(const std::vector<Eigen::Vector3f> &_points, std::string _name);
+    void deleteTrajectory(std::string _name);
+
+    // Variables for the planner
+    pcl::octree::OctreePointCloudSearch<pcl::PointXYZRGB> octree_;
+    std::vector<mp::Constraint> constraints_;
 private:
     Ui::PCLViewer_gui *ui;
 
-    boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer_;
+    std::shared_ptr<pcl::visualization::PCLVisualizer> viewer_;
     PointCloudT1::Ptr cloudT1_, cloudT1Filtered_;
     PointCloudT2::Ptr cloudT2_, cloudT2Filtered_;
     pcl::PolygonMesh untransformedUav_;
